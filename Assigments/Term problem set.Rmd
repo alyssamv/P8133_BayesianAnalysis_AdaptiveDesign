@@ -1,0 +1,93 @@
+---
+title: "Term problem set"
+author: "Alyssa Vanderbeek"
+date: "9/23/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Problem 1
+
+
+
+## Problem 2
+
+# a.
+```{r}
+p = 0.05
+n1 = 14
+e1 = 1
+ntotal = 34
+e2 = 4
+n2 = ntotal - n1
+
+# P(stopping at stage 1 | p = 0.05)
+x = pbinom(e1 - 1, n1, p); x # 0.48
+
+# Expected sample size
+n1*x + ntotal*(1 - x) # 24.24
+
+```
+
+# b. 
+```{r}
+t = c()
+for (i in e1:n1) {
+  s1 = dbinom(i, n1, p)
+  s2 = 0
+  if (4 - i > 0) {
+    for (j in (e2 - i):(ntotal - n1)) {
+      s2 = s2 + dbinom(j, ntotal - n1, p)
+    }
+  } else {
+    for (j in 0:(ntotal - n1)) {
+      s2 = s2 + dbinom(j, ntotal - n1, p)
+    }
+  }
+  t[i] = s1*s2
+}
+pgo1 = sum(t); pgo1 # 0.08
+```
+
+# c. 
+```{r}
+p = 0.2
+#pgo2 = (1 - pbinom(s1 - 1, n1, p)) * (1 - pbinom(s2 - 2, ntotal - n1, p))
+u = c()
+for (i in e1:n1) {
+  s1 = dbinom(i, n1, p)
+  s2 = 0
+  if (4 - i > 0) {
+    for (j in (e2 - i):(ntotal - n1)) {
+      s2 = s2 + dbinom(j, ntotal - n1, p)
+    }
+  } else {
+    for (j in 0:(ntotal - n1)) {
+      s2 = s2 + dbinom(j, ntotal - n1, p)
+    }
+  }
+  u[i] = s1*s2
+}
+pgo2 = sum(u); pgo2 # 0.90
+```
+
+# d.
+```{r}
+p0 = 0.05
+p1 = 0.2
+alpha = pgo1
+power = pgo2
+
+n = seq(5, 100, 1)
+# Sample size for a fixed design
+t1 = pbinom(s2 - 1, n, p0)
+pow = 1 - pbinom(s2 - 1, n, p1)
+
+index = intersect(which(t1 <= alpha), which(pow >= power))
+n[index[[1]]] # 50
+
+```
+
