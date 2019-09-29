@@ -45,54 +45,51 @@ t = sum(pe.total > (ps + d)) / N # left side of Bayesian decision rule
 # take only those values of alpha for which s=22 lends a "go" decision
 alpha = alpha[(which((t > alpha) == TRUE))]; alpha 
 
-### 2. For alphas that satisfy 1, find the subset that satisfy "go" for s=24 AND "no-go" for s=23
-## go/no-go decision for s=24
-t1 = sum(pe.total > (ps + d)) / N 
+### 2. For alphas that satisfy 1, find the subset that satisfy "go" for s2=24 AND "no-go" for s2=23 AND "no-go" for s1=5
+## go/no-go decision for s2=24
+t.go = sum(pe.total > (ps + d)) / N 
 
 ## go/no-go decision for s=23
 s2.no = s2 - 1
 a_cond = a + s2.no
 b_cond = b + ntotal - s2.no
-
 pe = rbeta(N, a_cond, b_cond)
-t2 = sum(pe > (ps + d)) / N; t2 > alpha 
+t.nogo2 = sum(pe > (ps + d)) / N
 
 ## go/no-go decision for s=23
 s1.no = s1 - 1
 a_cond = a + s1.no
 b_cond = b + n1 - s1.no
-
 pe = rbeta(N, a_cond, b_cond)
-t3 = sum(pe > (ps + d)) / N; t3 > alpha 
+t.nogo1 = sum(pe > (ps + d)) / N
 
-## Verify that the selected alpha makes the decision boundary s = 24
-index = Reduce(intersect, list(which((t1 > alpha) == TRUE), 
-                               which((t2 > alpha) == FALSE),
-                               which((t3 > alpha) == FALSE)))
+## Subset that satisfies all three conditions
+index = Reduce(intersect, list(which((t.go > alpha) == TRUE), 
+                               which((t.nogo2 > alpha) == FALSE),
+                               which((t.nogo1 > alpha) == FALSE)))
 alpha.test = alpha[index] # new alphas
 
 ### 3. Verify that final selected alpha(s) satisfy decision boundary
-## This should be a "go" decision
+## This should be a "go" decision (TRUE)
 s2.no = s2
 a_cond = a + s2.no
 b_cond = b + ntotal - s2.no
 pe = rbeta(N, a_cond, b_cond)
 t1 = sum(pe > (ps + d)) / N; t1 > alpha.test
 
-## This should be a "no-go" decision
+## This should be a "no-go" decision (FALSE)
 s2.no = s2 - 1
 a_cond = a + s2.no
 b_cond = b + ntotal - s2.no
 pe = rbeta(N, a_cond, b_cond)
 t2 = sum(pe > (ps + d)) / N; t2 > alpha.test 
 
-## This should be a "no-go" decision
+## This should be a "no-go" decision (FALSE)
 s1.no = s1 - 1
 a_cond = a + s1.no
 b_cond = b + n1 - s1.no
 pe = rbeta(N, a_cond, b_cond)
 t3 = sum(pe > (ps + d)) / N; t3 > alpha.test 
-
 
 c(d, alpha.test)
 ```
@@ -104,4 +101,76 @@ To mimic this design in the Bayesian formulation, we can set $(\delta, \alpha)$ 
 
 
 ## Problem 2
+
+```{r 2a}
+delta = d
+alpha = alpha.test
+
+## interim 1 at 20 patients
+n = 20
+s = seq(0, n, 1)
+dec = unlist(
+  lapply(s, function(i){
+  a_cond = a + i
+  b_cond = b + n - i
+  pe = rbeta(N, a_cond, b_cond)
+  t = sum(pe > (ps + delta)) / N
+  t > alpha 
+})
+)
+decision.20 = s[which(dec == TRUE)[1]]; decision.20
+
+## interim 2 at 40 patients
+n = 40
+s = seq(0, n, 1)
+dec = unlist(
+  lapply(s, function(i){
+  a_cond = a + i
+  b_cond = b + n - i
+  pe = rbeta(N, a_cond, b_cond)
+  t = sum(pe > (ps + delta)) / N
+  t > alpha 
+})
+)
+decision.40 = s[which(dec == TRUE)[1]]; decision.40
+
+## interim 3 at 60 patients
+n = 60
+s = seq(0, n, 1)
+dec = unlist(
+  lapply(s, function(i){
+  a_cond = a + i
+  b_cond = b + n - i
+  pe = rbeta(N, a_cond, b_cond)
+  t = sum(pe > (ps + delta)) / N
+  t > alpha 
+})
+)
+decision.60 = s[which(dec == TRUE)[1]]; decision.60
+
+## final look at 71 patients
+n = 71
+s = seq(0, n, 1)
+dec = unlist(
+  lapply(s, function(i){
+  a_cond = a + i
+  b_cond = b + n - i
+  pe = rbeta(N, a_cond, b_cond)
+  t = sum(pe > (ps + delta)) / N
+  t > alpha 
+})
+)
+decision = s[which(dec == TRUE)[1]]; decision
+```
+
+(a) Using the selection of design parameters from problem 1, $(\delta, \alpha)$ = (`r d`, `r alpha.test`), we stop the trial if $Pr(p_E > p_S + 0.15 | \text{data}) \leq 0.15$. The stopping boundaries at each interim analysis are then as follows:
+
+* At 20 subjects, stop the trial if <`r decision.20` subjects respond.
+* At 40 subjects, stop the trial if <`r decision.40` subjects respond.
+* At 60 subjects, stop the trial if <`r decision.60` subjects respond.
+* At the end of the trial (71 subjects), stop the trial if <`r decision` subjects respond.
+
+```{r 2b}
+
+```
 
