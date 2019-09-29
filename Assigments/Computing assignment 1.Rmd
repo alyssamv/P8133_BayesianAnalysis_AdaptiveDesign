@@ -13,100 +13,95 @@ source("~/Desktop/FALL 2019/Bayesian Design/P8133_BayesianAnalysis_AdaptiveDesig
 
 ## Question 1
 
-
-```{r 2stg_adaptive}
-p0 = 0.25
-p1 = 0.4
-
-n1 = 20 # stage 1 sample size
-s1 = 6 # stop for futility after stage 1 if less than s1 patients respond
-ntotal = 71 # total trial sample size (n1 + n2)
-s2 = 24 # "go" decision if at least s2/ntotal patients respond
-
-# Probability of a "go" decision under null
-# t = c()
-# for (i in s1:n1) {
-#   e1 = dbinom(i, n1, p0) # Pr(s1 = i | p = p0)
-#   e2 = 0
-#   if (s2 - i > 0) {
-#     for (j in (s2 - i):(ntotal - n1)) {
-#       e2 = e2 + dbinom(j, ntotal - n1, p0) # sum {Pr(s1 >= s2-i | p = p0)}
-#     }
-#   } else {
-#     for (j in 0:(ntotal - n1)) {
-#       e2 = e2 + dbinom(j, ntotal - n1, p0)
-#     }
-#   }
-#   t[i] = e1*e2
-# }
-# pgo.2stg = sum(t, na.rm = TRUE)
-# 
-# pnogo.2stg = 1 - pgo.2stg # Pr(no go) = 1 - Pr(go) = 0.951
-
-# pnogo.2stg = 1 - go.2stg(n1, s1, ntotal - n1, s2, p0)
-```
-
-```{r Bayesian_nogo}
+```{r Bayesian_nogo_sims}
 ### Prior distribution of null and alternative response rates
-n = 71 # total sample size
-s = 24 # futility interim
+n1 = 20
+s1 = 6
+ntotal = 71 # total sample size
+s2 = 24 # futility interim
 N = 10e4
 
 a.s = 25 # prior a for control 
 b.s = 75 # prior b for control
+ps = rbeta(N, a.s, b.s) # simulate control responses from prior
 
 a = 0.5
 b = 1.5
-a_cond = a + s # prior a for exp conditional on s
-b_cond = b + n - s # prior b for exp conditional on s
+a_cond.total = a + s2 # prior a for exp conditional on s
+b_cond.total = b + ntotal - s2 # prior b for exp conditional on s
+pe.total = rbeta(N, a_cond.total, b_cond.total) # simulate exp responses from prior
+# a_cond.interim = a + s1 # prior a for exp conditional on s
+# b_cond.interim = b + n1 - s1 # prior b for exp conditional on s
+# pe.interim = rbeta(N, a_cond.interim, b_cond.interim) # simulate exp responses from prior
+```
 
-ps = rbeta(N, a.s, b.s) # simulate control responses from prior
-pe = rbeta(N, a_cond, b_cond) # simulate exp responses from prior
-
-
-### Grid search for delta and alpha
+```{r}
+#### Find delta, alpha to satisfy decision boundary
 d = 0.15 # seq(0, 0.2, 0.01)[-1]
 alpha = seq(0, 1, 0.05)[-1]
 
-
-t = sum(pe > (ps + d)) / N # left side of Bayesian decision rule
+### 1. For given delta, find alpha s.t. s = 24 gives a "go" decision
+t = sum(pe.total > (ps + d)) / N # left side of Bayesian decision rule
 # take only those values of alpha for which s=22 lends a "go" decision
 alpha = alpha[(which((t > alpha) == TRUE))]; alpha 
 
+### 2. For alphas that satisfy 1, find the subset that satisfy "go" for s=24 AND "no-go" for s=23
 ## go/no-go decision for s=24
-t1 = sum(pe > (ps + d)) / N 
+t1 = sum(pe.total > (ps + d)) / N 
 
 ## go/no-go decision for s=23
-s = s - 1
-a_cond = a + s
-b_cond = b + n - s
+s2.no = s2 - 1
+a_cond = a + s2.no
+b_cond = b + ntotal - s2.no
 
 pe = rbeta(N, a_cond, b_cond)
 t2 = sum(pe > (ps + d)) / N; t2 > alpha 
 
+## go/no-go decision for s=23
+s1.no = s1 - 1
+a_cond = a + s1.no
+b_cond = b + n1 - s1.no
+
+pe = rbeta(N, a_cond, b_cond)
+t3 = sum(pe > (ps + d)) / N; t3 > alpha 
+
 ## Verify that the selected alpha makes the decision boundary s = 24
-index = intersect(which((t1 > alpha) == TRUE), which((t2 > alpha) == FALSE))
+index = Reduce(intersect, list(which((t1 > alpha) == TRUE), 
+                               which((t2 > alpha) == FALSE),
+                               which((t3 > alpha) == FALSE)))
 alpha.test = alpha[index] # new alphas
 
-# This should be a "go" decision
-s = s + 1
-a_cond = a + s
-b_cond = b + n - s
+### 3. Verify that final selected alpha(s) satisfy decision boundary
+## This should be a "go" decision
+s2.no = s2
+a_cond = a + s2.no
+b_cond = b + ntotal - s2.no
 pe = rbeta(N, a_cond, b_cond)
-t1 = sum(pe > (ps + d)) / N; t1 > alpha.test # TRUE -> go
+t1 = sum(pe > (ps + d)) / N; t1 > alpha.test
 
-# This should be a "no-go" decision
-s = s - 1
-a_cond = a + s
-b_cond = b + n - s
+## This should be a "no-go" decision
+s2.no = s2 - 1
+a_cond = a + s2.no
+b_cond = b + ntotal - s2.no
 pe = rbeta(N, a_cond, b_cond)
-t2 = sum(pe > (ps + d)) / N; t2 > alpha.test # FALSE -> no-go
+t2 = sum(pe > (ps + d)) / N; t2 > alpha.test 
 
+## This should be a "no-go" decision
+s1.no = s1 - 1
+a_cond = a + s1.no
+b_cond = b + n1 - s1.no
+pe = rbeta(N, a_cond, b_cond)
+t3 = sum(pe > (ps + d)) / N; t3 > alpha.test 
+
+
+c(d, alpha.test)
 ```
 
 
 The two-stage adaptive design as described in lecture is as follows: stage 1 enrolls 20 patients. At the interim, we stop the trial and conclude futility if less than 6 subjects respond. Otherwise, we continue onto stage 2 and enroll an additional 51 subjects for a total sample size of 71 subjects. At the end of the trial, we conclude futility ("no-go") if fewer than 24 subjects respond, and conclude efficacy ("go") if at least 24 subjects respond. 
 
-To mimic this design in the Bayesian formulation, we can set $(\delta, \alpha)$ = (`r d`, `r alpha.test`), which gives a "go" decision for 24 responses, and a no-go decision for 23 responses.
+To mimic this design in the Bayesian formulation, we can set $(\delta, \alpha)$ = (`r d`, `r alpha.test`), which gives a "go" decision for 24 responses, and a no-go decision for either 5/20 or 23/71 responses.
 
+
+## Problem 2
 
