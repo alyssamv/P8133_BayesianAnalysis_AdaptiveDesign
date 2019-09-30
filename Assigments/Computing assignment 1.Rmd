@@ -8,6 +8,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
+library(tidyverse)
 source("~/Desktop/FALL 2019/Bayesian Design/P8133_BayesianAnalysis_AdaptiveDesign/fns.R")
 ```
 
@@ -171,6 +172,49 @@ decision = s[which(dec == TRUE)[1]]; decision
 * At the end of the trial (71 subjects), stop the trial if <`r decision` subjects respond.
 
 ```{r 2b}
+pe.true = 0.25
+
+
+B = list(interim = c(),
+         futility = c())
+for (i in 1:N) {
+  subj = rbinom(ntotal, 1, pe.true)
+  if (sum(subj[1:20]) < decision.20) {
+    B$interim[i] = 20
+    B$futility[i] = TRUE
+  } else if (sum(subj[1:40]) < decision.40) {
+    B$interim[i] = 40
+    B$futility[i] = TRUE
+  } else if (sum(subj[1:60]) < decision.60) {
+    B$interim[i] = 60
+    B$futility[i] = TRUE
+  } else if (sum(subj) < decision) {
+    B$interim[i] = 71
+    B$futility[i] = TRUE
+  } else {
+    B$interim[i] = NA
+    B$futility[i] = FALSE
+  }
+}
+
+# Table of stopping times
+B %>%
+  as.data.frame %>%
+  group_by(interim) %>%
+  filter(!is.na(interim)) %>%
+  summarise(n = n(),
+            prop = round(n/N, 3)) %>%
+  select(-n) %>%
+  knitr::kable(col.names = c("Interim analysis", "Probability"),
+               caption = "Probability of stopping for futility at each interim analysis, assuming the trial has passed previous stopping rules")
 
 ```
+
+(b) When the true response rate is 0.25, the stopping rules from part (a) give a ~`r round(sum(B$futility) / N, 2)` probability of stopping for futility (which, in this case, would be the correct conclusion). The distribution of stopping times is given in Table 1.
+
+
+
+
+## Problem 3
+
 
