@@ -1,21 +1,28 @@
 ---
 title: "Term problem set"
-author: "Alyssa Vanderbeek"
-date: "9/23/2019"
+author: "Alyssa Vanderbeek (amv2187)"
+date: "2 December 2019"
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```
 
-## Problem 1
+R code used for computation is given at the end of the document.
+
+
+### Problem 1: (Preliminaries) For a randomized, placebo-controlled study of a statin for lowering LDL, we consider a reduction in LDL by 10mg=dL on average to be clinically meaningful, whereas patients in the placebo will experience no change on average. Assume that the variance of LDL is equal to 20mg=dL at both baseline and the 3-month follow-up in both groups.
+
+### a. What additional information or assumption(s) do you need to calculate a sample size?
+
+### b. State the assumptions you make and calculate the sample size required for a two-sided test at 5\% significance.
 
 
 
-## Problem 2
+### Problem 2: (Go/no-go) In a two-stage trial of an experimental treatment with a planned futility interim analysis, 14 patients are first enrolled and treated in the first stage. An additional of 20 patients will be enrolled and treated if there is at least 1 response in the first stage. At the end of the trial, the treatment is deemed promising ("go") when there are at least 4 responses in all enrolled patients.
 
-# a.
+### a. Suppose the true response rate is 5\%. What is the expected value of the sample size?
 ```{r}
 p = 0.05
 n1 = 14
@@ -25,69 +32,91 @@ e2 = 4
 n2 = ntotal - n1
 
 # P(stopping at stage 1 | p = 0.05)
-x = pbinom(e1 - 1, n1, p); x # 0.48
+x = pbinom(e1 - 1, n1, p) # 0.48
 
 # Expected sample size
-n1*x + ntotal*(1 - x) # 24.24
+n_expected = ceiling(n1*x + ntotal*(1 - x)) # 24.24
 
 ```
 
-# b. 
+For a true response rate of 5\%, the expected sample size of the trial is 25 subjects. 
+
+### b. Suppose the true response rate is 5\%. Evaluate the probability of a "go" decision.
 ```{r}
-t = c()
+f = c()
 for (i in e1:n1) {
-  s1 = dbinom(i, n1, p)
-  s2 = 0
-  if (4 - i > 0) {
-    for (j in (e2 - i):(ntotal - n1)) {
-      s2 = s2 + dbinom(j, ntotal - n1, p)
-    }
-  } else {
-    for (j in 0:(ntotal - n1)) {
-      s2 = s2 + dbinom(j, ntotal - n1, p)
-    }
-  }
-  t[i] = s1*s2
+  f[i] = dbinom(i, n1, p) * (1 - pbinom(e2 - i - 1, n2, p))
 }
-pgo1 = sum(t); pgo1 # 0.08
+pgo1 = sum(f, na.rm = T)
 ```
 
-# c. 
+The probability of a "go" decision is given by 
+\begin{align*}
+Pr(go) &= Pr(S_{14} \geq 1, S_{34} \geq 4 | p = 0.05) \\
+&= ... = \Sigma_{n=1}^{14} [Pr(S_14 = n|p = 0.05) * \Sigma_{m = n}^{34} [Pr(S_{20} 
+\geq 4-m | p = 0.05)]].
+\end{align*}
+
+For a true response rate of 5\%, the probability of a "go" decision is ~0.08.
+
+### c. Suppose the true response rate is 20\%. Evaluate the probability of a "go" decision.
 ```{r}
 p = 0.2
-#pgo2 = (1 - pbinom(s1 - 1, n1, p)) * (1 - pbinom(s2 - 2, ntotal - n1, p))
-u = c()
+f = c()
 for (i in e1:n1) {
-  s1 = dbinom(i, n1, p)
-  s2 = 0
-  if (4 - i > 0) {
-    for (j in (e2 - i):(ntotal - n1)) {
-      s2 = s2 + dbinom(j, ntotal - n1, p)
-    }
-  } else {
-    for (j in 0:(ntotal - n1)) {
-      s2 = s2 + dbinom(j, ntotal - n1, p)
-    }
-  }
-  u[i] = s1*s2
+  f[i] = dbinom(i, n1, p) * (1 - pbinom(e2 - i - 1, n2, p))
 }
-pgo2 = sum(u); pgo2 # 0.90
+pgo2 = sum(f, na.rm = T)
 ```
 
-# d.
+Using the same formulation for calculating $Pr(go)$ as above, for a true response rate of 20\%, the probability of making a "go" decision is ~0.90.
+
+### d. Using your result in (b) as type I error rate and (c) as power, evaluate the sample size required for a fixed design with null response 5\% and alternative response 20\%.
 ```{r}
 p0 = 0.05
 p1 = 0.2
 alpha = pgo1
 power = pgo2
 
-n = seq(5, 100, 1)
-# Sample size for a fixed design
-t1 = pbinom(s2 - 1, n, p0)
-pow = 1 - pbinom(s2 - 1, n, p1)
+ss = list()
+for (i in 1:50) {
+  n = i
+  s = seq(1, i, 1)
+  
+  t1 = 1 - pbinom(s - 1, n, p0)
+  pow = 1 - pbinom(s - 1, n, p1)
+  index = intersect(which(t1 <= alpha), which(pow >= power))
+  
+  if (length(index) == 0) {
+    ss[[i]] = NA
+  } else {
+    ss[[i]] = c(s[index[1]], n)
+  }
+}
 
-index = intersect(which(t1 <= alpha), which(pow >= power))
-n[index[[1]]] # 50
+n = ss[which(!is.na(ss))[1]][2]
+s = ss[which(!is.na(ss))[1]][1]
+
+
+```
+
+Setting type I error to 0.08 and power to 0.90, we find that the sample size required for a fixed design is `r n` subjects, for which we reject the null in favor of the alternative when we see a response from at least `r s`. 
+
+
+### Problem 3: (Predictive distribution) Suppose X1 follows an exponential distribution with rate .
+
+### a. Give a conjugate prior for Derive its posterior distribution and the corresponding prior predictive distribution of X1.
+
+### b. Suppose X1 and X2 are exchangeable. Derive the posterior predictive distribution of X2 given X1.
+
+### c. Derive the posterior predictive distribution of (X1 + X2)/2 given X1.
+
+
+\pagebreak
+
+## R code
+
+```{r, eval=FALSE}
 
 ```
 
