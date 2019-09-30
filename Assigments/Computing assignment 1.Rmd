@@ -6,7 +6,7 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 
 library(tidyverse)
 source("~/Desktop/FALL 2019/Bayesian Design/P8133_BayesianAnalysis_AdaptiveDesign/fns.R")
@@ -57,7 +57,7 @@ b_cond = b + ntotal - s2.no
 pe = rbeta(N, a_cond, b_cond)
 t.nogo2 = sum(pe > (ps + d)) / N
 
-## go/no-go decision for s=23
+## go/no-go decision for s1=5
 s1.no = s1 - 1
 a_cond = a + s1.no
 b_cond = b + n1 - s1.no
@@ -70,27 +70,28 @@ index = Reduce(intersect, list(which((t.go > alpha) == TRUE),
                                which((t.nogo1 > alpha) == FALSE)))
 alpha.test = alpha[index] # new alphas
 
-### 3. Verify that final selected alpha(s) satisfy decision boundary
-## This should be a "go" decision (TRUE)
-s2.no = s2
-a_cond = a + s2.no
-b_cond = b + ntotal - s2.no
-pe = rbeta(N, a_cond, b_cond)
-t1 = sum(pe > (ps + d)) / N; t1 > alpha.test
 
-## This should be a "no-go" decision (FALSE)
-s2.no = s2 - 1
-a_cond = a + s2.no
-b_cond = b + ntotal - s2.no
-pe = rbeta(N, a_cond, b_cond)
-t2 = sum(pe > (ps + d)) / N; t2 > alpha.test 
-
-## This should be a "no-go" decision (FALSE)
-s1.no = s1 - 1
-a_cond = a + s1.no
-b_cond = b + n1 - s1.no
-pe = rbeta(N, a_cond, b_cond)
-t3 = sum(pe > (ps + d)) / N; t3 > alpha.test 
+# ### 3. Verify that final selected alpha(s) satisfy decision boundary
+# ## This should be a "go" decision (TRUE)
+# s2.no = s2
+# a_cond = a + s2.no
+# b_cond = b + ntotal - s2.no
+# pe = rbeta(N, a_cond, b_cond)
+# t1 = sum(pe > (ps + d)) / N; t1 > alpha.test
+# 
+# ## This should be a "no-go" decision (FALSE)
+# s2.no = s2 - 1
+# a_cond = a + s2.no
+# b_cond = b + ntotal - s2.no
+# pe = rbeta(N, a_cond, b_cond)
+# t2 = sum(pe > (ps + d)) / N; t2 > alpha.test
+# 
+# ## This should be a "no-go" decision (FALSE)
+# s1.no = s1 - 1
+# a_cond = a + s1.no
+# b_cond = b + n1 - s1.no
+# pe = rbeta(N, a_cond, b_cond)
+# t3 = sum(pe > (ps + d)) / N; t3 > alpha.test
 
 c(d, alpha.test)
 ```
@@ -107,22 +108,25 @@ To mimic this design in the Bayesian formulation, we can set $(\delta, \alpha)$ 
 delta = d
 alpha = alpha.test
 
+interim.n = c(20, 40, 60, 71)
+stop.rule = c()
+
 ## interim 1 at 20 patients
-n = 20
+n = interim.n[1]
 s = seq(0, n, 1)
 dec = unlist(
   lapply(s, function(i){
-  a_cond = a + i
-  b_cond = b + n - i
-  pe = rbeta(N, a_cond, b_cond)
-  t = sum(pe > (ps + delta)) / N
-  t > alpha 
-})
+    a_cond = a + i
+    b_cond = b + n - i
+    pe = rbeta(N, a_cond, b_cond)
+    t = sum(pe > (ps + delta)) / N
+    t > alpha 
+  })
 )
-decision.20 = s[which(dec == TRUE)[1]]; decision.20
+stop.rule[1] = s[which(dec == TRUE)[1]]
 
 ## interim 2 at 40 patients
-n = 40
+n = interim.n[2]
 s = seq(0, n, 1)
 dec = unlist(
   lapply(s, function(i){
@@ -133,10 +137,10 @@ dec = unlist(
   t > alpha 
 })
 )
-decision.40 = s[which(dec == TRUE)[1]]; decision.40
+stop.rule[2] = s[which(dec == TRUE)[1]]
 
 ## interim 3 at 60 patients
-n = 60
+n = interim.n[3]
 s = seq(0, n, 1)
 dec = unlist(
   lapply(s, function(i){
@@ -147,10 +151,10 @@ dec = unlist(
   t > alpha 
 })
 )
-decision.60 = s[which(dec == TRUE)[1]]; decision.60
+stop.rule[3] = s[which(dec == TRUE)[1]]
 
 ## final look at 71 patients
-n = 71
+n = interim.n[4]
 s = seq(0, n, 1)
 dec = unlist(
   lapply(s, function(i){
@@ -161,15 +165,17 @@ dec = unlist(
   t > alpha 
 })
 )
-decision = s[which(dec == TRUE)[1]]; decision
+stop.rule[4] = s[which(dec == TRUE)[1]]
+
+#stop.rule
 ```
 
 (a) Using the selection of design parameters from problem 1, $(\delta, \alpha)$ = (`r d`, `r alpha.test`), we stop the trial if $Pr(p_E > p_S + 0.15 | \text{data}) \leq 0.15$. The stopping boundaries at each interim analysis are then as follows:
 
-* At 20 subjects, stop the trial if <`r decision.20` subjects respond.
-* At 40 subjects, stop the trial if <`r decision.40` subjects respond.
-* At 60 subjects, stop the trial if <`r decision.60` subjects respond.
-* At the end of the trial (71 subjects), stop the trial if <`r decision` subjects respond.
+* At 20 subjects, stop the trial if at least `r stop.rule[1]` subjects respond.
+* At 40 subjects, stop the trial if at least `r stop.rule[2]` subjects respond.
+* At 60 subjects, stop the trial if at least`r stop.rule[3]` subjects respond.
+* At the end of the trial (71 subjects), stop the trial if at least `r stop.rule[4]` subjects respond.
 
 ```{r 2b}
 pe.true = 0.25
@@ -177,19 +183,23 @@ pe.true = 0.25
 
 B = list(interim = c(),
          futility = c())
+
 for (i in 1:N) {
-  subj = rbinom(ntotal, 1, pe.true)
-  if (sum(subj[1:20]) < decision.20) {
-    B$interim[i] = 20
+  set.seed(i)
+  subj = rbinom(ntotal, 1, pe.true) # simulate 71 Bernoulli RV's with prob pe.true
+  
+  # stopping rules
+  if (sum(subj[1:interim.n[1]]) < stop.rule[1]) {
+    B$interim[i] = interim.n[1]
     B$futility[i] = TRUE
-  } else if (sum(subj[1:40]) < decision.40) {
-    B$interim[i] = 40
+  } else if (sum(subj[1:interim.n[2]]) < stop.rule[2]) {
+    B$interim[i] = interim.n[2]
     B$futility[i] = TRUE
-  } else if (sum(subj[1:60]) < decision.60) {
-    B$interim[i] = 60
+  } else if (sum(subj[1:interim.n[3]]) < stop.rule[3]) {
+    B$interim[i] = interim.n[3]
     B$futility[i] = TRUE
-  } else if (sum(subj) < decision) {
-    B$interim[i] = 71
+  } else if (sum(subj) < stop.rule[4]) {
+    B$interim[i] = interim.n[4]
     B$futility[i] = TRUE
   } else {
     B$interim[i] = NA
@@ -208,13 +218,277 @@ B %>%
   knitr::kable(col.names = c("Interim analysis", "Probability"),
                caption = "Probability of stopping for futility at each interim analysis, assuming the trial has passed previous stopping rules")
 
+#sum(B$futility) / N
 ```
 
 (b) When the true response rate is 0.25, the stopping rules from part (a) give a ~`r round(sum(B$futility) / N, 2)` probability of stopping for futility (which, in this case, would be the correct conclusion). The distribution of stopping times is given in Table 1.
 
+```{r 2c}
+pe.true = 0.4
 
+B = list(interim = c(),
+         futility = c())
 
+for (i in 1:N) {
+  set.seed(i)
+  subj = rbinom(ntotal, 1, pe.true) # simulate 71 Bernoulli RV's with prob pe.true
+  
+  # stopping rules
+  if (sum(subj[1:interim.n[1]]) < stop.rule[1]) {
+    B$interim[i] = interim.n[1]
+    B$futility[i] = TRUE
+  } else if (sum(subj[1:interim.n[2]]) < stop.rule[2]) {
+    B$interim[i] = interim.n[2]
+    B$futility[i] = TRUE
+  } else if (sum(subj[1:interim.n[3]]) < stop.rule[3]) {
+    B$interim[i] = interim.n[3]
+    B$futility[i] = TRUE
+  } else if (sum(subj) < stop.rule[4]) {
+    B$interim[i] = interim.n[4]
+    B$futility[i] = TRUE
+  } else {
+    B$interim[i] = NA
+    B$futility[i] = FALSE
+  }
+}
+
+# Table of stopping times
+B %>%
+  as.data.frame %>%
+  group_by(interim) %>%
+  filter(!is.na(interim)) %>%
+  summarise(n = n(),
+            prop = round(n/N, 3)) %>%
+  select(-n) %>%
+  knitr::kable(col.names = c("Interim analysis", "Probability"),
+               caption = "Probability of stopping for futility at each interim analysis, assuming the trial has passed previous stopping rules")
+
+#sum(B$futility) / N
+```
+
+(c) When the true response rate is 0.4, the stopping rules from part (a) give a ~`r round(sum(B$futility) / N, 2)` probability of stopping for futility (which, in this case, would be the incorrect conclusion). The distribution of stopping times is given in Table 1.
 
 ## Problem 3
 
 
+
+
+
+# R code
+
+### Problem 1
+
+```{r, eval=FALSE, echo=TRUE}
+### Prior distribution of null and alternative response rates
+n1 = 20
+s1 = 6
+ntotal = 71 # total sample size
+s2 = 24 # futility interim
+N = 10e4
+
+a.s = 25 # prior a for control 
+b.s = 75 # prior b for control
+ps = rbeta(N, a.s, b.s) # simulate control responses from prior
+
+a = 0.5
+b = 1.5
+a_cond.total = a + s2 # prior a for exp conditional on s
+b_cond.total = b + ntotal - s2 # prior b for exp conditional on s
+pe.total = rbeta(N, a_cond.total, b_cond.total) # simulate exp responses from prior
+
+#### Find delta, alpha to satisfy decision boundary
+d = 0.15 # seq(0, 0.2, 0.01)[-1]
+alpha = seq(0, 1, 0.05)[-1]
+
+### 1. For given delta, find alpha s.t. s = 24 gives a "go" decision
+t = sum(pe.total > (ps + d)) / N # left side of Bayesian decision rule
+# take only those values of alpha for which s=22 lends a "go" decision
+alpha = alpha[(which((t > alpha) == TRUE))]; alpha 
+
+### 2. For alphas that satisfy 1, find the subset that satisfy "go" for s2=24 AND "no-go" for s2=23 AND "no-go" for s1=5
+## go/no-go decision for s2=24
+t.go = sum(pe.total > (ps + d)) / N 
+
+## go/no-go decision for s=23
+s2.no = s2 - 1
+a_cond = a + s2.no
+b_cond = b + ntotal - s2.no
+pe = rbeta(N, a_cond, b_cond)
+t.nogo2 = sum(pe > (ps + d)) / N
+
+## go/no-go decision for s1=5
+s1.no = s1 - 1
+a_cond = a + s1.no
+b_cond = b + n1 - s1.no
+pe = rbeta(N, a_cond, b_cond)
+t.nogo1 = sum(pe > (ps + d)) / N
+
+## Subset that satisfies all three conditions
+index = Reduce(intersect, list(which((t.go > alpha) == TRUE), 
+                               which((t.nogo2 > alpha) == FALSE),
+                               which((t.nogo1 > alpha) == FALSE)))
+alpha.test = alpha[index] # new alphas
+
+c(d, alpha.test)
+```
+
+
+### Problem 2
+
+```{r 2a_appendix, eval=FALSE, echo=TRUE}
+### 2a
+delta = d
+alpha = alpha.test
+
+interim.n = c(20, 40, 60, 71)
+stop.rule = c()
+
+## interim 1 at 20 patients
+n = interim.n[1]
+s = seq(0, n, 1)
+dec = unlist(
+  lapply(s, function(i){
+  a_cond = a + i
+  b_cond = b + n - i
+  pe = rbeta(N, a_cond, b_cond)
+  t = sum(pe > (ps + delta)) / N
+  t > alpha 
+})
+)
+stop.rule[1] = s[which(dec == TRUE)[1]]
+
+## interim 2 at 40 patients
+n = interim.n[2]
+s = seq(0, n, 1)
+dec = unlist(
+  lapply(s, function(i){
+  a_cond = a + i
+  b_cond = b + n - i
+  pe = rbeta(N, a_cond, b_cond)
+  t = sum(pe > (ps + delta)) / N
+  t > alpha 
+})
+)
+stop.rule[2] = s[which(dec == TRUE)[1]]
+
+## interim 3 at 60 patients
+n = interim.n[3]
+s = seq(0, n, 1)
+dec = unlist(
+  lapply(s, function(i){
+  a_cond = a + i
+  b_cond = b + n - i
+  pe = rbeta(N, a_cond, b_cond)
+  t = sum(pe > (ps + delta)) / N
+  t > alpha 
+})
+)
+stop.rule[3] = s[which(dec == TRUE)[1]]
+
+## final look at 71 patients
+n = interim.n[4]
+s = seq(0, n, 1)
+dec = unlist(
+  lapply(s, function(i){
+  a_cond = a + i
+  b_cond = b + n - i
+  pe = rbeta(N, a_cond, b_cond)
+  t = sum(pe > (ps + delta)) / N
+  t > alpha 
+})
+)
+stop.rule[4] = s[which(dec == TRUE)[1]]
+
+#stop.rule
+```
+
+
+```{r 2b_appendix, eval=FALSE, echo=TRUE}
+### 2b
+pe.true = 0.25
+
+B = list(interim = c(),
+         futility = c())
+
+for (i in 1:N) {
+  set.seed(i)
+  subj = rbinom(ntotal, 1, pe.true) # simulate 71 Bernoulli RV's with prob pe.true
+  
+  # stopping rules
+  if (sum(subj[1:interim.n[1]]) < stop.rule[1]) {
+    B$interim[i] = interim.n[1]
+    B$futility[i] = TRUE
+  } else if (sum(subj[1:interim.n[2]]) < stop.rule[2]) {
+    B$interim[i] = interim.n[2]
+    B$futility[i] = TRUE
+  } else if (sum(subj[1:interim.n[3]]) < stop.rule[3]) {
+    B$interim[i] = interim.n[3]
+    B$futility[i] = TRUE
+  } else if (sum(subj) < stop.rule[4]) {
+    B$interim[i] = interim.n[4]
+    B$futility[i] = TRUE
+  } else {
+    B$interim[i] = NA
+    B$futility[i] = FALSE
+  }
+}
+
+# Table of stopping times
+B %>%
+  as.data.frame %>%
+  group_by(interim) %>%
+  filter(!is.na(interim)) %>%
+  summarise(n = n(),
+            prop = round(n/N, 3)) %>%
+  select(-n) %>%
+  knitr::kable(col.names = c("Interim analysis", "Probability"),
+               caption = "Probability of stopping for futility at each interim analysis, assuming the trial has passed previous stopping rules")
+
+sum(B$futility) / N
+```
+
+
+```{r 2c_appendix, eval=FALSE, echo=TRUE}
+### 2c
+
+pe.true = 0.4
+
+B = list(interim = c(),
+         futility = c())
+
+for (i in 1:N) {
+  set.seed(i)
+  subj = rbinom(ntotal, 1, pe.true) # simulate 71 Bernoulli RV's with prob pe.true
+  
+  # stopping rules
+  if (sum(subj[1:interim.n[1]]) < stop.rule[1]) {
+    B$interim[i] = interim.n[1]
+    B$futility[i] = TRUE
+  } else if (sum(subj[1:interim.n[2]]) < stop.rule[2]) {
+    B$interim[i] = interim.n[2]
+    B$futility[i] = TRUE
+  } else if (sum(subj[1:interim.n[3]]) < stop.rule[3]) {
+    B$interim[i] = interim.n[3]
+    B$futility[i] = TRUE
+  } else if (sum(subj) < stop.rule[4]) {
+    B$interim[i] = interim.n[4]
+    B$futility[i] = TRUE
+  } else {
+    B$interim[i] = NA
+    B$futility[i] = FALSE
+  }
+}
+
+# Table of stopping times
+B %>%
+  as.data.frame %>%
+  group_by(interim) %>%
+  filter(!is.na(interim)) %>%
+  summarise(n = n(),
+            prop = round(n/N, 3)) %>%
+  select(-n) %>%
+  knitr::kable(col.names = c("Interim analysis", "Probability"),
+               caption = "Probability of stopping for futility at each interim analysis, assuming the trial has passed previous stopping rules")
+
+sum(B$futility) / N
+```
