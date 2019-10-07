@@ -383,7 +383,7 @@ for (i in 1:N) {
 #sum(B$futility) / N
 ```
 
-(b) When the true response rate is 0.25, the stopping rules from part (a) give a ~`r round(sum(B$futility) / N, 2)` probability of stopping for futility (which, in this case, would be the incorrect conclusion). The distribution of stopping times is given in Table 3.
+(b) When the true response rate is 0.25, the stopping rules from part (a) give a `r sum(B$futility) / N` probability of stopping for futility (which, in this case, would be the correct conclusion). The distribution of stopping times is given in Table 3.
 
 ```{r 3b_table}
 # Table of stopping times
