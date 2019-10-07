@@ -14,81 +14,65 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r 3plus3}
 p.true = c(0.017, 0.043, 0.10, 0.22, 0.41)
 n.dose = 5
-cohort = 3
-# n.max = n.dose*cohort
+N = 1000
 
-# dose = 1
-# pt = 1
-# for (j in 1:n.dose) {
-#   dlt = c()
-#   for (i in 1:cohort){
-#     dlt[i] = rbinom(1, 1, p.true[i])
-#   }
-#   dose.tox = sum(dlt)
-#   
-#   if (dose.tox == 1) {
-#     
-#   }
-#   
-#   if (dose.tox >= 0.3) {
-#     print(c("stop", j, dose.tox))
-#     break
-#   } else {
-#     print(c(j, dose.tox))
-#   }
-# }
+results = vector(mode = "list", length = N)
 
-
-
-pt = 1
-n = 1
-dose = 1
-esc = 1
-
-dlts = vector(mode = 'list', length = 5)
-while (esc == 1 && dose <= n.dose && pt <= 6) {
-  dlts[[dose]][pt] = rbinom(1, 1, p.true[dose])
+for (sim in 1:N) {
+  pt = 1
+  n = 1
+  dose = 1
+  esc = 1
+  dlts = vector(mode = 'list', length = n.dose)
   
-  # If <3 pts enrolled on current dose, enroll next pt on same dose
-  if (length(dlts[[dose]]) < 3) {
-    pt = pt + 1
-    n = n + 1
-    dose = dose
-  # If 1/3 pts on current dose observe DLT, enroll next 3 patients on same dose
-  } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) == 3) {
-    pt = pt + 1
-    n = n + 1
-    dose = dose
-  # If 0/3 pts on current dose observe DLT, escalate dose
-  } else if (sum(dlts[[dose]]) == 0 && length(dlts[[dose]]) == 3) {
-    pt = 1
-    dose = dose + 1
-    n = n + 1
-  # If <=1 patient out of 3-6 observe DLT, stay at same dose
-  } else if (sum(dlts[[dose]]) <= 1 && length(dlts[[dose]]) > 3 && length(dlts[[dose]]) < 6) {
-    pt = pt + 1
-    n = n + 1
-    dose = dose
-  # If we observe 0/6 DLT, escalate dose
-  } else if (sum(dlts[[dose]]) == 0 && length(dlts[[dose]]) == 6) {
-    pt = 1
-    n = n + 1
-    dose = dose + 1
-  # If we observe 1/6 DLTs, stop escalation and declare this dose level the MTD
-  } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) == 6) {
-    esc = 0 # MTD
-    mtd = dose
-  # If we observe 2 DLTs at the current dose level, stop the trial and declare the previous dose the MTD
-  } else if (sum(dlts[[dose]]) > 1) {
-    esc = 0 
-    mtd = dose - 1
-  } else {
-    esc = 0
+  while (esc == 1 && dose <= n.dose && pt <= 6) {
+    dlts[[dose]][pt] = rbinom(1, 1, p.true[dose])
+    
+    # If <3 pts enrolled on current dose, enroll next pt on same dose
+    if (length(dlts[[dose]]) < 3) {
+      pt = pt + 1
+      n = n + 1
+      dose = dose
+      # If 1/3 pts on current dose observe DLT, enroll next 3 patients on same dose
+    } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) == 3) {
+      pt = pt + 1
+      n = n + 1
+      dose = dose
+      # If 0/3 pts on current dose observe DLT, escalate dose
+    } else if (sum(dlts[[dose]]) == 0 && length(dlts[[dose]]) == 3) {
+      pt = 1
+      dose = dose + 1
+      n = n + 1
+      # If <=1 patient out of 3-6 observe DLT, stay at same dose
+    } else if (sum(dlts[[dose]]) <= 1 && length(dlts[[dose]]) > 3 && length(dlts[[dose]]) < 6) {
+      pt = pt + 1
+      n = n + 1
+      dose = dose
+      # If we observe 0/6 DLT, escalate dose
+    } else if (sum(dlts[[dose]]) == 0 && length(dlts[[dose]]) == 6) {
+      pt = 1
+      n = n + 1
+      dose = dose + 1
+      # If we observe 1/6 DLTs, stop escalation and declare this dose level the MTD
+    } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) == 6) {
+      esc = 0 # MTD
+      mtd = dose
+      # If we observe 2 DLTs at the current dose level, stop the trial and declare the previous dose the MTD
+    } else if (sum(dlts[[dose]]) > 1) {
+      esc = 0 
+      mtd = dose - 1
+    } else {
+      esc = 0
+    }
   }
+  
+  results[[sim]] = list(dlts = unlist(lapply(dlts, sum)),
+                        nperdose = unlist(lapply(dlts, length)),
+                        n = n,
+                        mtd = mtd)
 }
-dlts; n; mtd
 
-
-
+n.dlts = do.call(rbind, lapply(results, `[[`, 1))
+n.pts = do.call(rbind, lapply(results, `[[`, 2))
+mtd = unlist(lapply(results, `[[`, 4))
 ```
-
