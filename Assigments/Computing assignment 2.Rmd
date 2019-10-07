@@ -7,6 +7,8 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
 ```
 
 ## Problem 1
@@ -75,4 +77,16 @@ for (sim in 1:N) {
 n.dlts = do.call(rbind, lapply(results, `[[`, 1))
 n.pts = do.call(rbind, lapply(results, `[[`, 2))
 mtd = unlist(lapply(results, `[[`, 4))
+
+
+
+rbind(p.true,
+      table(mtd)[-1]/N,
+      colMeans(n.pts),
+      colMeans(n.dlts)) %>%
+  `rownames<-`(c("True DLT probability",
+                             "Selection probability",
+                             "Avg number of patients treated",
+                             "Avg number of patients with DLT")) %>%
+  knitr::kable(row.names = TRUE)
 ```
