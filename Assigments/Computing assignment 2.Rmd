@@ -1,87 +1,102 @@
 ---
 title: "Computing assignment 2"
 author: "Alyssa Vanderbeek"
-date: "10/7/2019"
+date: "21 October 2019"
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 
 library(tidyverse)
 ```
 
 ## Problem 1
 
-```{r 3plus3}
+```{r 3plus3_function}
+
+performance_3plus3 <- function(p.true, n.dose, N){
+  results = vector(mode = "list", length = N)
+  
+  for (sim in 1:N) {
+    pt = 1 # patient on dose k
+    n = 1 # patient on trial
+    dose = 1 # dose k
+    esc = 1 # escalation yes/no
+    mtd = 0 # MTD
+    
+    dlts = vector(mode = 'list', length = n.dose)
+    
+    while (esc == 1 && dose <= n.dose && pt <= 6) {
+      dlts[[dose]][pt] = rbinom(1, 1, p.true[dose])
+      
+      # If <3 pts enrolled on current dose, enroll next pt on same dose
+      if (length(dlts[[dose]]) < 3) {
+        pt = pt + 1
+        n = n + 1
+        dose = dose
+        # If 1/3 pts on current dose observe DLT, enroll next 3 patients on same dose
+      } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) == 3) {
+        pt = pt + 1
+        n = n + 1
+        dose = dose
+        # If 0/3 pts on current dose observe DLT, escalate dose
+      } else if (sum(dlts[[dose]]) == 0 && length(dlts[[dose]]) == 3) {
+        pt = 1
+        mtd = dose
+        dose = dose + 1
+        n = n + 1
+        # If <=1 patient out of 3-6 observe DLT, stay at same dose
+      } else if (sum(dlts[[dose]]) <= 1 && length(dlts[[dose]]) > 3 && length(dlts[[dose]]) < 6) {
+        pt = pt + 1
+        n = n + 1
+        mtd = dose
+        dose = dose
+        # If we observe 0/6 DLT, escalate dose
+      } else if (sum(dlts[[dose]]) == 0 && length(dlts[[dose]]) == 6) {
+        pt = 1
+        n = n + 1
+        mtd = dose
+        dose = dose + 1
+        # If we observe 1/6 DLTs, stop escalation and declare this dose level the MTD
+      } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) == 6) {
+        esc = 0 # MTD
+        mtd = dose
+        # If we observe 2 DLTs at the current dose level, stop the trial and declare the previous dose the MTD
+      } else if (sum(dlts[[dose]]) > 1) {
+        esc = 0 
+        mtd = dose - 1
+      } else {
+        esc = 0
+      }
+    }
+    
+    results[[sim]] = list(dlts = unlist(lapply(dlts, sum)),
+                          nperdose = unlist(lapply(dlts, length)),
+                          n = n,
+                          mtd = mtd)
+  }
+  return(results)
+}
+```
+
+
+```{r p1}
 p.true = c(0.017, 0.043, 0.10, 0.22, 0.41)
 n.dose = 5
 N = 1000
 
-results = vector(mode = "list", length = N)
+set.seed(1)
+sims = performance_3plus3(p.true, n.dose, N)
 
-for (sim in 1:N) {
-  pt = 1
-  n = 1
-  dose = 1
-  esc = 1
-  dlts = vector(mode = 'list', length = n.dose)
-  
-  while (esc == 1 && dose <= n.dose && pt <= 6) {
-    dlts[[dose]][pt] = rbinom(1, 1, p.true[dose])
-    
-    # If <3 pts enrolled on current dose, enroll next pt on same dose
-    if (length(dlts[[dose]]) < 3) {
-      pt = pt + 1
-      n = n + 1
-      dose = dose
-      # If 1/3 pts on current dose observe DLT, enroll next 3 patients on same dose
-    } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) == 3) {
-      pt = pt + 1
-      n = n + 1
-      dose = dose
-      # If 0/3 pts on current dose observe DLT, escalate dose
-    } else if (sum(dlts[[dose]]) == 0 && length(dlts[[dose]]) == 3) {
-      pt = 1
-      dose = dose + 1
-      n = n + 1
-      # If <=1 patient out of 3-6 observe DLT, stay at same dose
-    } else if (sum(dlts[[dose]]) <= 1 && length(dlts[[dose]]) > 3 && length(dlts[[dose]]) < 6) {
-      pt = pt + 1
-      n = n + 1
-      dose = dose
-      # If we observe 0/6 DLT, escalate dose
-    } else if (sum(dlts[[dose]]) == 0 && length(dlts[[dose]]) == 6) {
-      pt = 1
-      n = n + 1
-      dose = dose + 1
-      # If we observe 1/6 DLTs, stop escalation and declare this dose level the MTD
-    } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) == 6) {
-      esc = 0 # MTD
-      mtd = dose
-      # If we observe 2 DLTs at the current dose level, stop the trial and declare the previous dose the MTD
-    } else if (sum(dlts[[dose]]) > 1) {
-      esc = 0 
-      mtd = dose - 1
-    } else {
-      esc = 0
-    }
-  }
-  
-  results[[sim]] = list(dlts = unlist(lapply(dlts, sum)),
-                        nperdose = unlist(lapply(dlts, length)),
-                        n = n,
-                        mtd = mtd)
-}
-
-n.dlts = do.call(rbind, lapply(results, `[[`, 1))
-n.pts = do.call(rbind, lapply(results, `[[`, 2))
-mtd = unlist(lapply(results, `[[`, 4))
+n.dlts = do.call(rbind, lapply(sims, `[[`, 1))
+n.pts = do.call(rbind, lapply(sims, `[[`, 2))
+mtd.1 = unlist(lapply(sims, `[[`, 4))
 
 
-
+## Table of performance metrics
 rbind(p.true,
-      table(mtd)[-1]/N,
+      table(mtd.1)[-1]/N,
       colMeans(n.pts),
       colMeans(n.dlts)) %>%
   `rownames<-`(c("True DLT probability",
@@ -89,4 +104,138 @@ rbind(p.true,
                              "Avg number of patients treated",
                              "Avg number of patients with DLT")) %>%
   knitr::kable(row.names = TRUE)
+```
+
+
+## Problem 2
+
+```{r 2a}
+p.true = c(0.10, 0.22, 0.41, 0.64, 0.81)
+n.dose = 5
+N = 1000
+
+set.seed(1)
+sims = performance_3plus3(p.true, n.dose, N)
+
+n.dlts = do.call(rbind, lapply(sims, `[[`, 1))
+n.pts = do.call(rbind, lapply(sims, `[[`, 2))
+mtd.1 = unlist(lapply(sims, `[[`, 4))
+
+mtd.selection = table(mtd.1[which(mtd.1 != 0)])/N
+if (length(mtd.selection) < 5) {
+  r = 5 - length(mtd.selection)
+  mtd.selection = c(mtd.selection, rep(0, r))
+}
+
+## Table of performance metrics
+rbind(p.true,
+      mtd.selection,
+      colMeans(n.pts),
+      colMeans(n.dlts)) %>%
+  `rownames<-`(c("True DLT probability",
+                 "Selection probability",
+                 "Avg number of patients treated",
+                 "Avg number of patients with DLT")) %>%
+  `colnames<-`(1:n.dose) %>%
+  knitr::kable(row.names = TRUE,
+               caption = "Performance metrics for 3+3 design when true DLT rates are p=0.10, 0.22, 0.41, 0.64, 0.81")
+```
+
+```{r 2b}
+p.true = c(0.043, 0.10, 0.22, 0.41, 0.64)
+n.dose = 5
+N = 1000
+
+set.seed(1)
+sims = performance_3plus3(p.true, n.dose, N)
+
+n.dlts = do.call(rbind, lapply(sims, `[[`, 1))
+n.pts = do.call(rbind, lapply(sims, `[[`, 2))
+mtd.1 = unlist(lapply(sims, `[[`, 4))
+
+mtd.selection = table(mtd.1[which(mtd.1 != 0)])/N
+if (length(mtd.selection) < 5) {
+  r = 5 - length(mtd.selection)
+  mtd.selection = c(mtd.selection, rep(0, r))
+}
+
+## Table of performance metrics
+rbind(p.true,
+      mtd.selection,
+      colMeans(n.pts),
+      colMeans(n.dlts)) %>%
+  `rownames<-`(c("True DLT probability",
+                 "Selection probability",
+                 "Avg number of patients treated",
+                 "Avg number of patients with DLT")) %>%
+  `colnames<-`(1:n.dose) %>%
+  knitr::kable(row.names = TRUE,
+               caption = "Performance metrics for 3+3 design when true DLT rates are p=0.043, 0.10, 0.22, 0.41, 0.64")
+```
+
+
+```{r 2c}
+p.true = c(0.007, 0.017, 0.043, 0.10, 0.22)
+n.dose = 5
+N = 1000
+
+set.seed(1)
+sims = performance_3plus3(p.true, n.dose, N)
+
+n.dlts = do.call(rbind, lapply(sims, `[[`, 1))
+n.pts = do.call(rbind, lapply(sims, `[[`, 2))
+mtd.1 = unlist(lapply(sims, `[[`, 4))
+
+mtd.selection = table(mtd.1[which(mtd.1 != 0)])/N
+if (length(mtd.selection) < 5) {
+  r = 5 - length(mtd.selection)
+  mtd.selection = c(mtd.selection, rep(0, r))
+}
+
+## Table of performance metrics
+rbind(p.true,
+      mtd.selection,
+      colMeans(n.pts),
+      colMeans(n.dlts)) %>%
+  `rownames<-`(c("True DLT probability",
+                 "Selection probability",
+                 "Avg number of patients treated",
+                 "Avg number of patients with DLT")) %>%
+  `colnames<-`(1:n.dose) %>%
+  knitr::kable(row.names = TRUE,
+               caption = "Performance metrics for 3+3 design when true DLT rates are p=0.007, 0.017, 0.043, 0.10, 0.22")
+```
+
+
+
+```{r 2d}
+p.true = c(0.003, 0.007, 0.017, 0.043, 0.10)
+n.dose = 5
+N = 1000
+
+set.seed(1)
+sims = performance_3plus3(p.true, n.dose, N)
+
+n.dlts = do.call(rbind, lapply(sims, `[[`, 1))
+n.pts = do.call(rbind, lapply(sims, `[[`, 2))
+mtd.1 = unlist(lapply(sims, `[[`, 4))
+
+mtd.selection = table(mtd.1[which(mtd.1 != 0)])/N
+if (length(mtd.selection) < 5) {
+  r = 5 - length(mtd.selection)
+  mtd.selection = c(mtd.selection, rep(0, r))
+}
+
+## Table of performance metrics
+rbind(p.true,
+      mtd.selection,
+      colMeans(n.pts),
+      colMeans(n.dlts)) %>%
+  `rownames<-`(c("True DLT probability",
+                 "Selection probability",
+                 "Avg number of patients treated",
+                 "Avg number of patients with DLT")) %>%
+  `colnames<-`(1:n.dose) %>%
+  knitr::kable(row.names = TRUE,
+               caption = "Performance metrics for 3+3 design when true DLT rates are p=0.003, 0.007, 0.017, 0.043, 0.10")
 ```
