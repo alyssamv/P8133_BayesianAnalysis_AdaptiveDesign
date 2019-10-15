@@ -14,7 +14,9 @@ library(tidyverse)
 ## Problem 1
 
 ```{r 3plus3_function}
-
+# p.true = vector of true DLT probabilities for each test dose
+# n.dose = number (integer) of test doses
+# N = number of simulations to run
 performance_3plus3 <- function(p.true, n.dose, N){
   results = vector(mode = "list", length = N)
   
@@ -67,7 +69,7 @@ performance_3plus3 <- function(p.true, n.dose, N){
         esc = 0 
         mtd = dose - 1
       } else {
-        esc = 0
+        dlts[[dose]][pt] = NA # reassign entry as NA in case of error
       }
     }
     
@@ -82,12 +84,12 @@ performance_3plus3 <- function(p.true, n.dose, N){
 
 
 ```{r p1}
-p.true = c(0.017, 0.043, 0.10, 0.22, 0.41)
+p.true1 = c(0.017, 0.043, 0.10, 0.22, 0.41)
 n.dose = 5
-N = 1000
+N = 1e3
 
 set.seed(1)
-sims = performance_3plus3(p.true, n.dose, N)
+sims = performance_3plus3(p.true1, n.dose, N)
 
 n.dlts = do.call(rbind, lapply(sims, `[[`, 1))
 n.pts = do.call(rbind, lapply(sims, `[[`, 2))
@@ -95,7 +97,7 @@ mtd.1 = unlist(lapply(sims, `[[`, 4))
 
 
 ## Table of performance metrics
-rbind(p.true,
+rbind(p.true1,
       table(mtd.1)[-1]/N,
       colMeans(n.pts),
       colMeans(n.dlts)) %>%
@@ -110,12 +112,12 @@ rbind(p.true,
 ## Problem 2
 
 ```{r 2a}
-p.true = c(0.10, 0.22, 0.41, 0.64, 0.81)
+p.true2 = c(0.10, 0.22, 0.41, 0.64, 0.81)
 n.dose = 5
 N = 1000
 
 set.seed(1)
-sims = performance_3plus3(p.true, n.dose, N)
+sims = performance_3plus3(p.true2, n.dose, N)
 
 n.dlts = do.call(rbind, lapply(sims, `[[`, 1))
 n.pts = do.call(rbind, lapply(sims, `[[`, 2))
@@ -128,7 +130,7 @@ if (length(mtd.selection) < 5) {
 }
 
 ## Table of performance metrics
-rbind(p.true,
+rbind(p.true2,
       mtd.selection,
       colMeans(n.pts),
       colMeans(n.dlts)) %>%
@@ -142,12 +144,12 @@ rbind(p.true,
 ```
 
 ```{r 2b}
-p.true = c(0.043, 0.10, 0.22, 0.41, 0.64)
+p.true3 = c(0.043, 0.10, 0.22, 0.41, 0.64)
 n.dose = 5
 N = 1000
 
 set.seed(1)
-sims = performance_3plus3(p.true, n.dose, N)
+sims = performance_3plus3(p.true3, n.dose, N)
 
 n.dlts = do.call(rbind, lapply(sims, `[[`, 1))
 n.pts = do.call(rbind, lapply(sims, `[[`, 2))
@@ -160,7 +162,7 @@ if (length(mtd.selection) < 5) {
 }
 
 ## Table of performance metrics
-rbind(p.true,
+rbind(p.true3,
       mtd.selection,
       colMeans(n.pts),
       colMeans(n.dlts)) %>%
@@ -175,12 +177,12 @@ rbind(p.true,
 
 
 ```{r 2c}
-p.true = c(0.007, 0.017, 0.043, 0.10, 0.22)
+p.true4 = c(0.007, 0.017, 0.043, 0.10, 0.22)
 n.dose = 5
 N = 1000
 
 set.seed(1)
-sims = performance_3plus3(p.true, n.dose, N)
+sims = performance_3plus3(p.true4, n.dose, N)
 
 n.dlts = do.call(rbind, lapply(sims, `[[`, 1))
 n.pts = do.call(rbind, lapply(sims, `[[`, 2))
@@ -193,7 +195,7 @@ if (length(mtd.selection) < 5) {
 }
 
 ## Table of performance metrics
-rbind(p.true,
+rbind(p.true4,
       mtd.selection,
       colMeans(n.pts),
       colMeans(n.dlts)) %>%
@@ -209,12 +211,12 @@ rbind(p.true,
 
 
 ```{r 2d}
-p.true = c(0.003, 0.007, 0.017, 0.043, 0.10)
+p.true5 = c(0.003, 0.007, 0.017, 0.043, 0.10)
 n.dose = 5
 N = 1000
 
 set.seed(1)
-sims = performance_3plus3(p.true, n.dose, N)
+sims = performance_3plus3(p.true5, n.dose, N)
 
 n.dlts = do.call(rbind, lapply(sims, `[[`, 1))
 n.pts = do.call(rbind, lapply(sims, `[[`, 2))
@@ -227,7 +229,7 @@ if (length(mtd.selection) < 5) {
 }
 
 ## Table of performance metrics
-rbind(p.true,
+rbind(p.true5,
       mtd.selection,
       colMeans(n.pts),
       colMeans(n.dlts)) %>%
@@ -238,4 +240,138 @@ rbind(p.true,
   `colnames<-`(1:n.dose) %>%
   knitr::kable(row.names = TRUE,
                caption = "Performance metrics for 3+3 design when true DLT rates are p=0.003, 0.007, 0.017, 0.043, 0.10")
+```
+
+
+## Problem 3
+
+```{r crm}
+library(dfcrm)
+
+N = 100
+n = 31
+p = 0.1
+tru1 = which(p.true1 == p)
+
+p01 = getprior(halfwidth = 0.06, target = p, nu = tru1, nlevel = n.dose); p01
+simfit1 = crmsim(p.true1, prior = p01, target = p, n = n, x0 = 3, nsim = N)
+plot(simfit1)
+simfit1$MTD
+
+
+
+tru2 = which(p.true2 == p)
+
+p02 = getprior(halfwidth = 0.06, target = p, nu = tru2, nlevel = n.dose); p02
+simfit2 = crmsim(p.true2, prior = p02, target = p, n = n, x0 = 3, nsim = N)
+plot(simfit2)
+simfit2$MTD
+
+
+
+tru3 = which(p.true3 == p)
+
+p03 = getprior(halfwidth = 0.06, target = p, nu = tru3, nlevel = n.dose); p03
+simfit3 = crmsim(p.true3, prior = p03, target = p, n = n, x0 = 3, nsim = N)
+plot(simfit3)
+simfit3$MTD
+
+
+
+tru4 = which(p.true4 == p)
+
+p04 = getprior(halfwidth = 0.06, target = p, nu = tru4, nlevel = n.dose); p04
+simfit4 = crmsim(p.true4, prior = p04, target = p, n = n, x0 = 3, nsim = N)
+plot(simfit4)
+simfit4$MTD
+
+
+
+
+tru5 = which(p.true5 == p)
+
+p05 = getprior(halfwidth = 0.06, target = p, nu = tru5, nlevel = n.dose); p05
+simfit5 = crmsim(p.true5, prior = p01, target = p, n = n, x0 = 3, nsim = N)
+plot(simfit5)
+simfit5$MTD
+
+
+```
+
+
+```{r crm_metrics}
+
+## Table of performance metrics
+rbind(p.true1,
+      simfit1$MTD,
+      simfit1$level,
+      simfit1$tox) %>%
+  `rownames<-`(c("True DLT probability",
+                 "Selection probability",
+                 "Avg number of patients treated",
+                 "Avg number of patients with DLT")) %>%
+  `colnames<-`(1:n.dose) %>%
+  knitr::kable(row.names = TRUE,
+               caption = "Performance metrics for 3+3 design when true DLT rates are p=0.017, 0.043, 0.10, 0.22, 0.41")
+
+## Table of performance metrics
+rbind(p.true2,
+      simfit2$MTD,
+      simfit2$level,
+      simfit2$tox) %>%
+  `rownames<-`(c("True DLT probability",
+                 "Selection probability",
+                 "Avg number of patients treated",
+                 "Avg number of patients with DLT")) %>%
+  `colnames<-`(1:n.dose) %>%
+  knitr::kable(row.names = TRUE,
+               caption = "Performance metrics for 3+3 design when true DLT rates are p=0.10, 0.22, 0.41, 0.64, 0.81")
+
+## Table of performance metrics
+rbind(p.true3,
+      simfit3$MTD,
+      simfit3$level,
+      simfit3$tox) %>%
+  `rownames<-`(c("True DLT probability",
+                 "Selection probability",
+                 "Avg number of patients treated",
+                 "Avg number of patients with DLT")) %>%
+  `colnames<-`(1:n.dose) %>%
+  knitr::kable(row.names = TRUE,
+               caption = "Performance metrics for 3+3 design when true DLT rates are p=0.043, 0.10, 0.22, 0.41, 0.64")
+
+## Table of performance metrics
+rbind(p.true4,
+      simfit4$MTD,
+      simfit4$level,
+      simfit4$tox) %>%
+  `rownames<-`(c("True DLT probability",
+                 "Selection probability",
+                 "Avg number of patients treated",
+                 "Avg number of patients with DLT")) %>%
+  `colnames<-`(1:n.dose) %>%
+  knitr::kable(row.names = TRUE,
+               caption = "Performance metrics for 3+3 design when true DLT rates are p=0.007, 0.017, 0.043, 0.10, 0.22")
+
+## Table of performance metrics
+rbind(p.true5,
+      simfit5$MTD,
+      simfit5$level,
+      simfit5$tox) %>%
+  `rownames<-`(c("True DLT probability",
+                 "Selection probability",
+                 "Avg number of patients treated",
+                 "Avg number of patients with DLT")) %>%
+  `colnames<-`(1:n.dose) %>%
+  knitr::kable(row.names = TRUE,
+               caption = "Performance metrics for 3+3 design when true DLT rates are p=0.003, 0.007, 0.017, 0.043, 0.10")
+
+
+
+avg.PCS = mean(c(simfit1$MTD[tru1],
+                 simfit2$MTD[tru2],
+                 simfit3$MTD[tru3],
+                 simfit4$MTD[tru4],
+                 simfit5$MTD[tru5]))
+avg.PCS
 ```
