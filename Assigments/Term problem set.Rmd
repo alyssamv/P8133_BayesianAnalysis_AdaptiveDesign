@@ -103,13 +103,133 @@ s = ss[which(!is.na(ss))[1]][1]
 Setting type I error to 0.08 and power to 0.90, we find that the sample size required for a fixed design is `r n` subjects, for which we reject the null in favor of the alternative when we see a response from at least `r s`. 
 
 
-### Problem 3: (Predictive distribution) Suppose X1 follows an exponential distribution with rate .
+## Problem 3: (Predictive distribution) Suppose X1 follows an exponential distribution with rate .
 
 ### a. Give a conjugate prior for Derive its posterior distribution and the corresponding prior predictive distribution of X1.
 
 ### b. Suppose X1 and X2 are exchangeable. Derive the posterior predictive distribution of X2 given X1.
 
 ### c. Derive the posterior predictive distribution of (X1 + X2)/2 given X1.
+
+
+## Problem 4: Suppose the toxicity probability of dose level 1 is 0.25. Calculate the probability that the 3+3 algorithm will declare dose level 1 safe (i.e., below the MTD).
+
+```{r 3plus3_function}
+# p.true = vector of true DLT probabilities for each test dose
+# n.dose = number (integer) of test doses
+# N = number of simulations to run
+performance_3plus3 <- function(p.true, n.dose, N){
+  results = vector(mode = "list", length = N)
+  
+  for (sim in 1:N) {
+    pt = 1 # patient on dose k
+    n = 1 # patient on trial
+    dose = 1 # dose k
+    esc = 1 # escalation yes/no
+    mtd = 0 # MTD
+    
+    dlts = vector(mode = 'list', length = n.dose)
+    
+    while (esc == 1 && dose <= n.dose && pt <= 6) {
+      dlts[[dose]][pt] = rbinom(1, 1, p.true[dose])
+      
+      # If <3 pts enrolled on current dose, enroll next pt on same dose
+      if (length(dlts[[dose]]) < 3) {
+        pt = pt + 1
+        n = n + 1
+        dose = dose
+        # If 1/3 pts on current dose observe DLT, enroll next 3 patients on same dose
+      } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) == 3) {
+        pt = pt + 1
+        n = n + 1
+        dose = dose
+        # If 0/3 pts on current dose observe DLT, escalate dose
+      } else if (sum(dlts[[dose]]) == 0 && length(dlts[[dose]]) == 3) {
+        pt = 1
+        mtd = dose
+        dose = dose + 1
+        n = n + 1
+        # If <=1 patient out of 3-6 observe DLT, stay at same dose
+      } else if (sum(dlts[[dose]]) <= 1 && length(dlts[[dose]]) > 3 && length(dlts[[dose]]) < 6) {
+        pt = pt + 1
+        n = n + 1
+        mtd = dose
+        dose = dose
+        # If we observe 0/6 DLT, escalate dose
+      } else if (sum(dlts[[dose]]) == 0 && length(dlts[[dose]]) == 6) {
+        pt = 1
+        n = n + 1
+        mtd = dose
+        dose = dose + 1
+        # If we observe 1/6 DLTs, stop escalation and declare this dose level the MTD
+      } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) == 6) {
+        esc = 0 # MTD
+        mtd = dose
+        # If we observe 2 DLTs at the current dose level, stop the trial and declare the previous dose the MTD
+      } else if (sum(dlts[[dose]]) > 1) {
+        esc = 0 
+        mtd = dose - 1
+      } else {
+        dlts[[dose]][pt] = NA # reassign entry as NA in case of error
+      }
+    }
+    
+    results[[sim]] = list(dlts = unlist(lapply(dlts, sum)),
+                          nperdose = unlist(lapply(dlts, length)),
+                          n = n,
+                          mtd = mtd)
+  }
+  return(results)
+}
+```
+
+
+```{r}
+N = 1e3
+
+set.seed(1)
+sims = performance_3plus3(0.025, 1, N)
+
+mtd.1 = unlist(lapply(sims, `[[`, 4))
+mean(mtd.1)
+```
+
+The 3+3 design will declare the dose safe with probability `r mean(mtd.1)`.
+
+## Problem 5: 
+
+
+```{r}
+# p.true = c(0.02, 0.04, 0.10, 0.25, 0.50)
+# n.dose = length(p.true)
+# N = 1e3
+# 
+# set.seed(1)
+# sims = performance_3plus3(0.025, 1, N)
+# 
+# mtd = unlist(lapply(sims, `[[`, 4))
+# mean(mtd.1)
+```
+
+
+## Problem 6
+
+```{r}
+library(dfcrm)
+target = 0.1
+prior = c(0.05, 0.12, 0.25, 0.40, 0.55)
+trueP = c(0.02, 0.04, 0.10, 0.25, 0.50)
+N = 20
+crmoutput = crmsim(trueP, prior, target, N, 3, model="logistic")
+crmoutput$MTD
+```
+
+## Problem 7
+
+```{r}
+crm.sim = crmsim(PI = trueP, prior = prior, target = target, n = N, x0 = 3, nsim = 10)
+crm.sim$MTD
+```
 
 
 \pagebreak
