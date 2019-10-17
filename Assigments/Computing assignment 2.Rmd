@@ -84,9 +84,13 @@ performance_3plus3 <- function(p.true, n.dose, N){
 
 
 ```{r p1}
+
+pcs.33 = c()
+
 p.true1 = c(0.017, 0.043, 0.10, 0.22, 0.41)
 n.dose = 5
 N = 1e3
+p = 0.1
 
 set.seed(1)
 sims = performance_3plus3(p.true1, n.dose, N)
@@ -95,10 +99,17 @@ n.dlts = do.call(rbind, lapply(sims, `[[`, 1))
 n.pts = do.call(rbind, lapply(sims, `[[`, 2))
 mtd.1 = unlist(lapply(sims, `[[`, 4))
 
+mtd.selection = table(mtd.1[which(mtd.1 != 0)])/N
+if (length(mtd.selection) < 5) {
+  r = 5 - length(mtd.selection)
+  mtd.selection = c(mtd.selection, rep(0, r))
+}
+
+pcs.33[1] = mtd.selection[which(p.true1 == p)]
 
 ## Table of performance metrics
 rbind(p.true1,
-      table(mtd.1)[-1]/N,
+      mtd.selection, #table(mtd.1)[-1]/N,
       colMeans(n.pts),
       colMeans(n.dlts)) %>%
   `rownames<-`(c("True DLT probability",
@@ -128,6 +139,8 @@ if (length(mtd.selection) < 5) {
   r = 5 - length(mtd.selection)
   mtd.selection = c(mtd.selection, rep(0, r))
 }
+
+pcs.33[2] = mtd.selection[which(p.true2 == p)]
 
 ## Table of performance metrics
 rbind(p.true2,
@@ -161,6 +174,8 @@ if (length(mtd.selection) < 5) {
   mtd.selection = c(mtd.selection, rep(0, r))
 }
 
+pcs.33[3] = mtd.selection[which(p.true3 == p)]
+
 ## Table of performance metrics
 rbind(p.true3,
       mtd.selection,
@@ -193,6 +208,8 @@ if (length(mtd.selection) < 5) {
   r = 5 - length(mtd.selection)
   mtd.selection = c(mtd.selection, rep(0, r))
 }
+
+pcs.33[4] = mtd.selection[which(p.true4 == p)]
 
 ## Table of performance metrics
 rbind(p.true4,
@@ -228,6 +245,8 @@ if (length(mtd.selection) < 5) {
   mtd.selection = c(mtd.selection, rep(0, r))
 }
 
+pcs.33[5] = mtd.selection[which(p.true5 == p)]
+
 ## Table of performance metrics
 rbind(p.true5,
       mtd.selection,
@@ -245,67 +264,75 @@ rbind(p.true5,
 
 ## Problem 3
 
-```{r crm}
+```{r, results='hide'}
 library(dfcrm)
 
-N = 100
-n = 31
-p = 0.1
-tru1 = which(p.true1 == p)
+crm_wrapper <- function(prior, truth, n, target, N, guess) {
+  n.dose = length(truth)
+  
+  tru = which(truth == target)
+  p0 = prior
+  sim = crmsim(truth, prior = p0, target = target, n = n, x0 = 3, nsim = N)
+  
+  return(c(truth = tru, sim))
+}
 
-p01 = getprior(halfwidth = 0.06, target = p, nu = tru1, nlevel = n.dose); p01
-simfit1 = crmsim(p.true1, prior = p01, target = p, n = n, x0 = 3, nsim = N)
-plot(simfit1)
-simfit1$MTD
+ppp = list(p.true1, p.true2, p.true3, p.true4, p.true5)
 
+priors = lapply(1:5, function(i){
+  getprior(halfwidth = 0.05, target = 0.1, nu = i, nlevel = n.dose)
+})
 
+# across all truths, how does our skeleton perform?
+test = lapply(priors, function(p){
+  lapply(ppp, function(i){
+    crm_wrapper(prior = p, truth = i, n = 31, target = 0.1, N = 50, guess = i)
+  })
+  }
+)
 
-tru2 = which(p.true2 == p)
+truMTD = lapply(test, function(i){
+  lapply(i, `[[`, "truth")
+}) %>%
+  unlist %>%
+  unique
+truMTD
 
-p02 = getprior(halfwidth = 0.06, target = p, nu = tru2, nlevel = n.dose); p02
-simfit2 = crmsim(p.true2, prior = p02, target = p, n = n, x0 = 3, nsim = N)
-plot(simfit2)
-simfit2$MTD
+selection_prob = lapply(1:length(test), function(i){ # for each prior
+  lapply(1:length(test[[i]]), function(j){
+    test[[i]][[j]]$MTD[truMTD[j]] # get the probability of selecting the correct dose as MTD under different truths
+  }) %>% unlist
+})
 
-
-
-tru3 = which(p.true3 == p)
-
-p03 = getprior(halfwidth = 0.06, target = p, nu = tru3, nlevel = n.dose); p03
-simfit3 = crmsim(p.true3, prior = p03, target = p, n = n, x0 = 3, nsim = N)
-plot(simfit3)
-simfit3$MTD
-
-
-
-tru4 = which(p.true4 == p)
-
-p04 = getprior(halfwidth = 0.06, target = p, nu = tru4, nlevel = n.dose); p04
-simfit4 = crmsim(p.true4, prior = p04, target = p, n = n, x0 = 3, nsim = N)
-plot(simfit4)
-simfit4$MTD
-
-
-
-
-tru5 = which(p.true5 == p)
-
-p05 = getprior(halfwidth = 0.06, target = p, nu = tru5, nlevel = n.dose); p05
-simfit5 = crmsim(p.true5, prior = p01, target = p, n = n, x0 = 3, nsim = N)
-plot(simfit5)
-simfit5$MTD
+PCS.crm = lapply(selection_prob, mean) %>% unlist
+PCS.crm
 
 
 ```
 
+The CRM performs best under all 5 true scenarios, when we establish our skeleton as `r round(priors[[which(PCS.crm == max(PCS.crm))]], 3)` (we guess that the true MTD is the 4th dose, with halfwidth of 0.05). The average probability of correct selection (PCS) under this prior is `r PCS.crm[[which(PCS.crm == max(PCS.crm))]]`, which is better than the PCS using 3+3, which is equal to `r mean(pcs.33)`.
 
-```{r crm_metrics}
+
+```{r, eval = FALSE}
+do.call(cbind, selection_prob) %>%
+  as.data.frame() %>%
+  gather(key = "x", value = "PCS") %>%
+  group_by(x) %>%
+  ggplot(aes(x = rep(1:5, 5), y = PCS, group = x)) +
+  geom_line(aes(color = x)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  gghighlight::gghighlight(PCS[5] == 0.72, use_group_by = TRUE)
+```
+
+
+```{r crm_metrics, eval = FALSE}
 
 ## Table of performance metrics
 rbind(p.true1,
-      simfit1$MTD,
-      simfit1$level,
-      simfit1$tox) %>%
+      test[[1]][[2]]$MTD,
+      test[[1]][[2]]$level,
+      test[[1]][[2]]$tox) %>%
   `rownames<-`(c("True DLT probability",
                  "Selection probability",
                  "Avg number of patients treated",
