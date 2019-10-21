@@ -32,12 +32,12 @@ performance_3plus3 <- function(p.true, n.dose, N){
     while (esc == 1 && dose <= n.dose && pt <= 6) {
       dlts[[dose]][pt] = rbinom(1, 1, p.true[dose])
       
-      # If <3 pts enrolled on current dose, enroll next pt on same dose
-      if (length(dlts[[dose]]) < 3) {
+      # If <3 pts enrolled on current dose and <2 DLTs, enroll next pt on same dose
+      if (sum(dlts[[dose]]) <= 1 && length(dlts[[dose]]) < 3) {
         pt = pt + 1
         n = n + 1
         dose = dose
-        # If 1/3 pts on current dose observe DLT, enroll next 3 patients on same dose
+        # If 1/3 pts on current dose observe DLT, enroll next pt on same dose
       } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) == 3) {
         pt = pt + 1
         n = n + 1
@@ -45,29 +45,26 @@ performance_3plus3 <- function(p.true, n.dose, N){
         # If 0/3 pts on current dose observe DLT, escalate dose
       } else if (sum(dlts[[dose]]) == 0 && length(dlts[[dose]]) == 3) {
         pt = 1
-        mtd = dose
         dose = dose + 1
         n = n + 1
-        # If <=1 patient out of 3-6 observe DLT, stay at same dose
-      } else if (sum(dlts[[dose]]) <= 1 && length(dlts[[dose]]) > 3 && length(dlts[[dose]]) < 6) {
+        # If 2 patients out of 2-3 observe DLT, stop trial and declare the previous dose MTD
+      } else if (sum(dlts[[dose]]) == 2 && length(dlts[[dose]]) <= 3) {
+        esc = 0
+        mtd = dose - 1
+        # If <=1 patient out of 4-6 observe DLT, stay at same dose
+      } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) > 3 && length(dlts[[dose]]) < 6) {
         pt = pt + 1
         n = n + 1
-        mtd = dose
         dose = dose
-        # If we observe 0/6 DLT, escalate dose
-      } else if (sum(dlts[[dose]]) == 0 && length(dlts[[dose]]) == 6) {
-        pt = 1
-        n = n + 1
-        mtd = dose
-        dose = dose + 1
         # If we observe 1/6 DLTs, stop escalation and declare this dose level the MTD
       } else if (sum(dlts[[dose]]) == 1 && length(dlts[[dose]]) == 6) {
         esc = 0 # MTD
         mtd = dose
-        # If we observe 2 DLTs at the current dose level, stop the trial and declare the previous dose the MTD
-      } else if (sum(dlts[[dose]]) > 1) {
-        esc = 0 
+        # If we observe 2 DLTs for 4-6 pts, stop the trial and declare the previous dose the MTD
+      } else if (sum(dlts[[dose]]) == 2 && length(dlts[[dose]]) > 3 && length(dlts[[dose]]) <= 6) {
+        esc = 0
         mtd = dose - 1
+        # In case of error
       } else {
         dlts[[dose]][pt] = NA # reassign entry as NA in case of error
       }
@@ -259,17 +256,17 @@ rbind(p.true5,
   `colnames<-`(1:n.dose) %>%
   knitr::kable(row.names = TRUE,
                caption = "Performance metrics for 3+3 design when true DLT rates are p=0.003, 0.007, 0.017, 0.043, 0.10")
+
+mean_n = mean(unlist(lapply(sims, `[[`, "n")))
 ```
 
 
 ## Problem 3
 
-```{r, results='hide'}
+```{r crm, results='hide'}
 library(dfcrm)
 
 crm_wrapper <- function(prior, truth, n, target, N, guess) {
-  n.dose = length(truth)
-  
   tru = which(truth == target)
   p0 = prior
   sim = crmsim(truth, prior = p0, target = target, n = n, x0 = 3, nsim = N)
@@ -286,17 +283,16 @@ priors = lapply(1:5, function(i){
 # across all truths, how does our skeleton perform?
 test = lapply(priors, function(p){
   lapply(ppp, function(i){
+    set.seed(p)
     crm_wrapper(prior = p, truth = i, n = 31, target = 0.1, N = 50, guess = i)
   })
-  }
-)
+})
 
 truMTD = lapply(test, function(i){
   lapply(i, `[[`, "truth")
 }) %>%
   unlist %>%
   unique
-truMTD
 
 selection_prob = lapply(1:length(test), function(i){ # for each prior
   lapply(1:length(test[[i]]), function(j){
@@ -305,34 +301,22 @@ selection_prob = lapply(1:length(test), function(i){ # for each prior
 })
 
 PCS.crm = lapply(selection_prob, mean) %>% unlist
-PCS.crm
-
 
 ```
 
-The CRM performs best under all 5 true scenarios, when we establish our skeleton as `r round(priors[[which(PCS.crm == max(PCS.crm))]], 3)` (we guess that the true MTD is the 4th dose, with halfwidth of 0.05). The average probability of correct selection (PCS) under this prior is `r PCS.crm[[which(PCS.crm == max(PCS.crm))]]`, which is better than the PCS using 3+3, which is equal to `r mean(pcs.33)`.
+Compared to the 3+3, the CRM is more consistent (less variable) in its selection of MTD. It therefore enrolls more patients at or near the target toxicity level (TTL), whereas the 3+3 does not allow specification of a TTL. But this comes at the cost of a larger overall sample size; n=31 in the CRM compared to an average N of `r mean_n` in the 3+3. 
+
+Under all 5 true scenarios, I establish the skeleton as `r round(priors[[which(PCS.crm == max(PCS.crm))]], 3)` (I guess that the true MTD is the 4th dose, with halfwidth of 0.05). The average probability of correct selection (PCS) under this prior is `r PCS.crm[[which(PCS.crm == max(PCS.crm))]]`.
 
 
-```{r, eval = FALSE}
-do.call(cbind, selection_prob) %>%
-  as.data.frame() %>%
-  gather(key = "x", value = "PCS") %>%
-  group_by(x) %>%
-  ggplot(aes(x = rep(1:5, 5), y = PCS, group = x)) +
-  geom_line(aes(color = x)) +
-  theme_bw() +
-  theme(legend.position = "none") +
-  gghighlight::gghighlight(PCS[5] == 0.72, use_group_by = TRUE)
-```
+```{r crm_metrics}
 
-
-```{r crm_metrics, eval = FALSE}
-
+optimal = test[[4]]
 ## Table of performance metrics
 rbind(p.true1,
-      test[[1]][[2]]$MTD,
-      test[[1]][[2]]$level,
-      test[[1]][[2]]$tox) %>%
+      optimal[[1]]$MTD,
+      optimal[[1]]$level,
+      optimal[[1]]$tox) %>%
   `rownames<-`(c("True DLT probability",
                  "Selection probability",
                  "Avg number of patients treated",
@@ -343,9 +327,9 @@ rbind(p.true1,
 
 ## Table of performance metrics
 rbind(p.true2,
-      simfit2$MTD,
-      simfit2$level,
-      simfit2$tox) %>%
+      optimal[[2]]$MTD,
+      optimal[[2]]$level,
+      optimal[[2]]$tox) %>%
   `rownames<-`(c("True DLT probability",
                  "Selection probability",
                  "Avg number of patients treated",
@@ -356,9 +340,9 @@ rbind(p.true2,
 
 ## Table of performance metrics
 rbind(p.true3,
-      simfit3$MTD,
-      simfit3$level,
-      simfit3$tox) %>%
+      optimal[[3]]$MTD,
+      optimal[[3]]$level,
+      optimal[[3]]$tox) %>%
   `rownames<-`(c("True DLT probability",
                  "Selection probability",
                  "Avg number of patients treated",
@@ -369,9 +353,9 @@ rbind(p.true3,
 
 ## Table of performance metrics
 rbind(p.true4,
-      simfit4$MTD,
-      simfit4$level,
-      simfit4$tox) %>%
+      optimal[[4]]$MTD,
+      optimal[[4]]$level,
+      optimal[[4]]$tox) %>%
   `rownames<-`(c("True DLT probability",
                  "Selection probability",
                  "Avg number of patients treated",
@@ -382,9 +366,9 @@ rbind(p.true4,
 
 ## Table of performance metrics
 rbind(p.true5,
-      simfit5$MTD,
-      simfit5$level,
-      simfit5$tox) %>%
+      optimal[[5]]$MTD,
+      optimal[[5]]$level,
+      optimal[[5]]$tox) %>%
   `rownames<-`(c("True DLT probability",
                  "Selection probability",
                  "Avg number of patients treated",
@@ -393,12 +377,4 @@ rbind(p.true5,
   knitr::kable(row.names = TRUE,
                caption = "Performance metrics for 3+3 design when true DLT rates are p=0.003, 0.007, 0.017, 0.043, 0.10")
 
-
-
-avg.PCS = mean(c(simfit1$MTD[tru1],
-                 simfit2$MTD[tru2],
-                 simfit3$MTD[tru3],
-                 simfit4$MTD[tru4],
-                 simfit5$MTD[tru5]))
-avg.PCS
 ```
