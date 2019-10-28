@@ -1,0 +1,242 @@
+---
+title: "Bayesian computation"
+author: "Alyssa Vanderbeek"
+date: "10/28/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(rstan)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+setwd(file.path(getwd(), "Stan_files"))
+```
+
+## Stan syntax
+
+A Stan model has 6 program blocks:
+* data (required) - reads external information 
+* transformed data - data preprocessing
+* parameters (required) - defines sampling space
+* model (reuired) - defines likelihood and prior(s)
+* 
+
+
+## Bayesian linear model
+
+### Problem 1
+
+```{r}
+set.seed(1)
+n = 30
+beta0 = 10
+beta1 = 5
+sigma = 2
+x = rnorm(n, mean = 10)
+epsilon = rnorm(n)
+y = beta0 + beta1*x + epsilon
+plot(y~x)
+```
+
+```{r}
+stan_data = list(N = n, x = x, y = y)
+stan_fit = stan(file = "1LinearRegression.stan",
+                data = stan_data,
+                warmup = 500,
+                iter = 1000,
+                chains = 4,
+                seed = 1)
+print(stan_fit)
+
+posterior = extract(stan_fit)
+```
+
+```{r}
+standard_lm = lm(stan_data$y ~ stan_data$x)
+summary(standard_lm)
+
+as.data.frame(stan_data) %>%
+  ggplot(., aes(x = x, y = y)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y~x) +
+  theme_bw()
+```
+
+```{r}
+sapply(posterior, var)
+
+as.data.frame(posterior) %>%
+  gather(key = "parameter", value = "value") %>%
+  ggplot(., aes(x = parameter, y = value)) +
+    geom_boxplot()
+
+stan_plot(stan_fit)
+```
+
+
+### Problem 2
+
+```{r}
+stan_data = list(N = n, 
+                 x = model.matrix(~x),
+                 y = y,
+                 K = 2)
+stan_fit2 = stan(file = "2LinearRegression.stan",
+                 data = stan_data,
+                 warmup = 500,
+                 iter = 1000,
+                 chains = 4,
+                 seed = 1)
+print(stan_fit2)
+
+stan_plot(stan_fit2)
+
+mean(posterior$beta1 > 5.1)
+#mean(rnorm(1e3, mean = summary(stan_fit2)$summary[2, "mean"], sd = summary(stan_fit2)$summary[2, "sd"]) > 5.1)
+```
+
+### Problem 3
+
+```{r}
+stan_trace(stan_fit2)
+```
+
+### Problem 4
+
+```{r}
+stan_fit3 = stan(file = "3LinearRegression.stan",
+                 data = stan_data,
+                 warmup = 500,
+                 iter = 1000,
+                 chains = 4,
+                 seed = 1)
+y_rep = as.matrix(stan_fit3, pars = "y_rep")
+dim(y_rep)
+
+# par(mfrow = c(2, 1))
+# plot(density(y))
+# plot(density(y_rep))
+
+bayesplot::ppc_dens_overlay(y, y_rep[1:200, ])
+```
+
+
+
+## Hierarchical model
+
+```{r}
+y = c(6, 1, 10, 0, 11, 1, 0, 1, 11, 0, 6, 0, 9, 11, 25, 1)
+S = c(17, 7, 25, 1, 20, 3, 3, 1, 27, 3, 16, 0, 23, 14, 39, 4)
+Drug = rep(c("Erlotinib", "Erlotinib+bexaorotane", "Vandetanib", "Sorafenib"), each = 4)
+Marker = rep(c("EGFR", "KRAS/BRAF", "VEGF", "RXR/Cyclin D1"), times = 4)
+mydata = data.frame(y, S, Drug, Marker)
+
+mydata1 = mydata[which(mydata$Marker == "EGFR"), ]
+```
+
+
+### Problem 1
+
+```{r}
+stan_data = list(N = 4, y = mydata1$y, S = mydata1$S)
+stan_fit1a = stan(file = "1aBinomial.stan",
+                  data = stan_data,
+                  warmup = 500,
+                  iter = 1000,
+                  chains = 4,
+                  seed = 1)
+print(stan_fit1a)
+```
+
+
+```{r}
+stan_data = list(N = 4,
+                 X = model.matrix(~Drug, data = mydata1),
+                 y = mydata1$y,
+                 S = mydata1$S,
+                 D = 4)
+stan_fit1b = stan(file = "1bLogisticRegression.stan",
+                  data = stan_data,
+                  warmup = 500,
+                  iter = 1000,
+                  chains = 4,
+                  seed = 1)
+print(stan_fit1b)
+
+posterior = rstan::extract(stan_fit1b)
+transformed = exp(posterior)/(1 + exp(posterior))
+
+# manual transformation of theta values
+theta = vector(mode = "list", length = 4)
+for (i in 1:2000) {
+  xb = stan_data$X %*% posterior$beta[i, ]
+  t = exp(xb) / (1 + exp(xb))
+  theta[[1]][i] = t[1, 1]
+  theta[[2]][i] = t[2, 1]
+  theta[[3]][i] = t[3, 1]
+  theta[[4]][i] = t[4, 1]
+}
+sapply(theta, mean)
+```
+
+
+### Problem 2
+
+```{r}
+stan_data = list(N = 4,
+                 X = model.matrix(~Drug, data = mydata1),
+                 y = mydata1$y,
+                 S = mydata1$S,
+                 D = 4)
+stan_fit2 = stan(file = "2LogisticRegression.stan",
+                 data = stan_data,
+                 warmup = 500,
+                 iter = 1000,
+                 chains = 4,
+                 seed = 1)
+print(stan_fit2)
+```
+
+
+### Problem 3
+
+```{r}
+mydata2 = mydata[which(mydata$Drug == "Erlotinib+bexaorotane"), ]
+stan_data = list(N = 4, y = mydata2$y, S = mydata2$S)
+stan_fit3a = stan(file = "3aBinomialHierarchical.stan",
+                  data = stan_data,
+                  warmup = 500,
+                  iter = 1000,
+                  chains = 4,
+                  seed = 1)
+print(stan_fit3a)
+
+```
+
+
+```{r}
+stan_data = list(N = 16, 
+                 X = model.matrix(~Drug, data = mydata),
+                 y = mydata$y,
+                 S = mydata$S,
+                 D = 4,
+                 m = rep(seq(1:4), times = 4),
+                 M = 4)
+stan_fit3b = stan(file = "3bLogisticHierarchical.stan",
+                  data = stan_data,
+                  warmup = 500,
+                  iter = 1000,
+                  chains = 4,
+                  seed = 1)
+print(stan_fit3b)
+
+summary(stan_fit3b)$summary %>% 
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  filter(str_detect(rowname, "beta"))
+```
+
