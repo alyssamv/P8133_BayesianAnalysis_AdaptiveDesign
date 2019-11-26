@@ -188,15 +188,7 @@ block_design_v2 = function(N, block_size, attenuation = 1, test){
     rand.A = r^attenuation / ((r^attenuation) + ((1 - r)^attenuation))
   }
   
-  if (test == "Chi") { # Chi-squared
-    tbl = table(Y$response, Y$arm)
-    test = chisq.test(tbl)
-    return(test$p.value)
-  } else { # Mantel-Haenszel
-    data <- table(Y$arm, Y$response, Y$block)
-    test = mantelhaen.test(data)
-    return (test$p.value)
-  }
+  return(Y)
   
 }
 ```
@@ -204,18 +196,27 @@ block_design_v2 = function(N, block_size, attenuation = 1, test){
 
 ```{r}
 set.seed(1)
-trials.4a = sapply(1:sims, block_design_v2, N = 120, block_size = 30, test = "Chi")
+trials.4 = lapply(1:sims, block_design_v2, N = 120, block_size = 30, test = "Chi")
 
-rej = mean(trials.4a < 0.05)
+Chi = sapply(trials.4, function(i){
+  tbl = table(i$response, i$arm)
+  test = chisq.test(tbl)
+  return(test$p.value)
+})
+
+rej = mean(Chi < 0.05)
 ```
 
-In conducting a block design with a chi-square test, we reject the null in favor of the alternative that there is a treatment-dependent difference in response `r round(rej*100, 2)`\% of the time.
+In conducting a block design with a chi-square test, we reject the null in favor of the alternative that there is a treatment-dependent difference in response `r round(rej*100, 2)`\% of the time. 
 
 ```{r}
-set.seed(1)
-trials.4b = sapply(1:sims, block_design_v2, N = 120, block_size = 30, test = "MH")
+MH = sapply(trials.4, function(i){
+  data <- table(i$arm, i$response, i$block)
+  test = mantelhaen.test(data)
+  return (test$p.value)
+})
 
-rej = mean(trials.4b < 0.05)
+rej = mean(MH < 0.05)
 ```
 
-By contrast, under a Mantel-Haenzel test, we reject the null `r round(rej*100, 2)`\% of the time. 
+By contrast, under a Mantel-Haenzel test, we reject the null `r round(rej*100, 2)`\% of the time. This stark contrast to the Chi-square test under the same scenario shows just how poorly Chi-square is at accounting for time trends.
