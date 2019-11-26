@@ -18,8 +18,6 @@ phase2 <- function(p.true, n, p0, alpha = 0.05) {
 
 
 
-
-
 pipeline <- function(p.true = NULL, # vector of DLT rates for each dose
                      n.dose = NULL, # number of test doses
                      p.response, # vector of response probabilities for each dose level
@@ -33,33 +31,48 @@ pipeline <- function(p.true = NULL, # vector of DLT rates for each dose
                      seed = NULL
                      ) {
   
-  if (design == "3+3") {
+  ### Phase I trial 
+  if (p1.design == "3+3") {
     phase1 = UBCRM::sim3p3(truerate = p.true,
                            seed = seed)
+    n1 = sum(phase1$data$npt)
     rp2d = phase1$mtd
-  } else if (design == "crm") {
+  } else if (p1.design == "crm") {
     prior = dfcrm::getprior(halfwidth = 0.05, 
                             target = targetDLT, 
                             nu = mtd.guess, 
                             nlevel = n.dose)
     firstdose = 3
-    phase1 = crmsim(PI = p.true, 
-                    prior = prior, 
-                    target = targetDLT, 
-                    n = p1.n, 
-                    x0 = firstdose, 
-                    nsim = 1)
+    phase1 = dfcrm::crmsim(PI = p.true, 
+                           prior = prior, 
+                           target = targetDLT, 
+                           n = p1.n, 
+                           x0 = firstdose, 
+                           nsim = 1)
+    n1 = p1.n
     rp2d = phase1$MTD
   }
   
-  
-  p = p.response[[rp2d]]
-  
-  phase2 = phase2(p.true = p, 
-                  n = p2.n, 
-                  p0 = hist, 
-                  alpha = p2.alpha)
-  
-  return(phase2)
+  if (!(rp2d %in% 1:n.dose)) {
+    return(c("p1.n" = NA, 
+             "rp2d" = rp2d, 
+             "rp2d.eff" = NA, 
+             NA))
+  } else {
+    # Efficacy for RP2D
+    p = p.response[[rp2d]]
+    
+    ### Phase II SAT
+    phase2 = phase2(p.true = p, 
+                    n = p2.n, 
+                    p0 = hist, 
+                    alpha = p2.alpha)
+    
+    
+    return(c("p1.n" = n1, 
+             "rp2d" = rp2d, 
+             "rp2d.eff" = p, 
+             phase2))
+  }
   
 }
