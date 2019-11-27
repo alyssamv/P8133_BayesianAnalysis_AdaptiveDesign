@@ -23,6 +23,13 @@ pipeline <- function(p.true = NULL, # vector of DLT rates for each dose
                      p.response, # vector of response probabilities for each dose level
                      targetDLT = 0.1,
                      mtd.guess = 3,
+                     real.doses = c(), # vector of real dose amounts (eg in mg)
+                     efficacy_hurdle = 0.5, # minimum acceptable efficacy
+                     toxicity_hurdle = 0.3, # maximum acceptable toxicity
+                     eff0 = 0.5, # eff required when toxicity impossible
+                     tox1 = 0.65, # maximum toxicity permitted when efficacy is guaranteed
+                     eff_star = 0.7, # ?
+                     tox_star = 0.25, # ?
                      p1.design = c("3+3", "crm", "efftox"), # design selection for phase I
                      hist, # historical response rate
                      p1.n,
@@ -51,6 +58,42 @@ pipeline <- function(p.true = NULL, # vector of DLT rates for each dose
                            nsim = 1)
     n1 = p1.n
     rp2d = phase1$MTD
+  } else if (p1.design == "efftox") {
+    p <- efftox_solve_p(eff0 = eff0, tox1 = tox1, eff_star = eff_star, tox_star = tox_star)
+    
+    dat <- list(
+      num_doses = n.dose,
+      real_doses = real.doses, # vector of the actual doses being administered (suppose )
+      efficacy_hurdle = efficacy_hurdle,
+      toxicity_hurdle = toxicity_hurdle,
+      p_e = 0.1,
+      p_t = 0.1,
+      p = p,
+      eff0 = eff0,
+      tox1 = tox1,
+      eff_star = eff_star,
+      tox_star = tox_star,
+      
+      alpha_mean = -7.9593, alpha_sd = 3.5487,
+      beta_mean = 1.5482, beta_sd = 3.5018,
+      gamma_mean = 0.7367, gamma_sd = 2.5423,
+      zeta_mean = 3.4181, zeta_sd = 2.4406,
+      eta_mean = 0, eta_sd = 0.2,
+      psi_mean = 0, psi_sd = 1,
+      
+      doses = c(),
+      tox   = c(),
+      eff   = c(),
+      num_patients = 0
+    )
+    
+    p1 = efftox_simulate(dat, num_sims = 1, first_dose = 1, 
+                           true_eff = p.response,
+                           true_tox = p.true,
+                           cohort_sizes = rep(3, 13))
+    
+    n1 = length(sims$efficacies[[1]])
+    rp2d = p1$recommended_dose
   }
   
   if (!(rp2d %in% 1:n.dose)) {
