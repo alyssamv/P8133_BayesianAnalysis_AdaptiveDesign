@@ -55,11 +55,12 @@ pipeline <- function(p.true = NULL, # vector of DLT rates for each dose
                            target = targetDLT, 
                            n = p1.n, 
                            x0 = firstdose, 
-                           nsim = 1)
+                           nsim = 1,
+                           seed = NULL)
     n1 = p1.n
     rp2d = phase1$MTD
   } else if (p1.design == "efftox") {
-    p <- efftox_solve_p(eff0 = eff0, tox1 = tox1, eff_star = eff_star, tox_star = tox_star)
+    p <- trialr::efftox_solve_p(eff0 = eff0, tox1 = tox1, eff_star = eff_star, tox_star = tox_star)
     
     dat <- list(
       num_doses = n.dose,
@@ -87,20 +88,20 @@ pipeline <- function(p.true = NULL, # vector of DLT rates for each dose
       num_patients = 0
     )
     
-    p1 = efftox_simulate(dat, num_sims = 1, first_dose = 1, 
-                           true_eff = p.response,
-                           true_tox = p.true,
-                           cohort_sizes = rep(3, 13))
+    p1 = trialr::efftox_simulate(dat, num_sims = 1, first_dose = 1, 
+                                 true_eff = p.response,
+                                 true_tox = p.true,
+                                 cohort_sizes = rep(3, p1.n/3))
     
     n1 = length(sims$efficacies[[1]])
     rp2d = p1$recommended_dose
   }
   
   if (!(rp2d %in% 1:n.dose)) {
-    return(c("p1.n" = NA, 
+    return(list("p1.n" = NA, 
              "rp2d" = rp2d, 
              "rp2d.eff" = NA, 
-             NA))
+             "phase2" = NA))
   } else {
     # Efficacy for RP2D
     p = p.response[[rp2d]]
@@ -112,10 +113,10 @@ pipeline <- function(p.true = NULL, # vector of DLT rates for each dose
                     alpha = p2.alpha)
     
     
-    return(c("p1.n" = n1, 
+    return(list("p1.n" = n1, 
              "rp2d" = rp2d, 
              "rp2d.eff" = p, 
-             phase2))
+             "phase2" = phase2))
   }
   
 }

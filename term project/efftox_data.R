@@ -1,9 +1,11 @@
 library(trialr)
 
 p <- efftox_solve_p(eff0 = 0.5, tox1 = 0.65, eff_star = 0.7, tox_star = 0.25)
+
+?efftox_params
 dat <- list(
   num_doses = 5,
-  real_doses = c(1, 2, 4, 6.6, 10),
+  real_doses = c(1, 2, 4, 6.6, 10), # vector of the actual doses being administered (suppose )
   efficacy_hurdle = 0.5,
   toxicity_hurdle = 0.3,
   p_e = 0.1,
@@ -29,7 +31,7 @@ dat <- list(
 
 
 set.seed(1)
-sims = efftox_simulate(dat, num_sims = 100, first_dose = 1, 
+sims = efftox_simulate(dat, num_sims = 1, first_dose = 1, 
                        true_eff = c(0.20, 0.40, 0.60, 0.80, 0.90),
                        true_tox = c(0.05, 0.10, 0.15, 0.20, 0.40),
                        cohort_sizes = rep(3, 13))
