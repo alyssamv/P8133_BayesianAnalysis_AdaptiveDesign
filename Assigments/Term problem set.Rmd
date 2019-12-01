@@ -275,12 +275,216 @@ crm.sim = crmsim(PI = trueP, prior = prior, target = target, n = N, x0 = 3, nsim
 crm.sim$MTD
 ```
 
+## Problem 11
 
-\pagebreak
+```{r ptw_a}
+ptw = function(p_a, p_b, r_a, r_b, n) {
+  
+  # 1:1 randomization of first patient
+  alloc = rbinom(1, 1, p_a)
+  pts = c()
+  outcome = c()
+  
+  for (i in 1:n) {
+    
+    # If allocated to treatment A
+    if (alloc == 1) {
+      o = rbinom(1, 1, r_a)
+      pts[[i]] = 0
+      
+      # If success, stay on trt A, otherwise switch to trt B
+      if (o == 1) {
+        alloc = alloc
+      } else {
+        alloc = 0
+      }
+      
+    # If allocated to trt B  
+    } else {
+      o = rbinom(1, 1, r_b)
+      pts[[i]] = 1
 
-## R code
+      # If success, stay on trt B, otherwise switch to trt A
+      if (o == 1) {
+        alloc = alloc
+      } else {
+        alloc = 1
+      }
+      
+    }
+    outcome[[i]] = o
+  }
+  
+  return(pts)
+}
 
-```{r, eval=FALSE}
+response.a = 0.2
+response.b = 0.8
+n.sim = 1e4
+
+set.seed(1)
+ptw_sims = lapply(1:n.sim, function(i){
+  ptw(0.5, 0.5, response.a, response.b, 4)
+})
+
+prop.B.ptw = mean(sapply(ptw_sims, mean))
+
+####
+
+balanced_design = function(r_a, r_b, n){
+  
+  p_a = p_b = 0.5
+  pts = c()
+  outcome = c()
+  
+  for (i in 1:n) {
+    
+    # 1:1 randomization of first patient
+    alloc = rbinom(1, 1, p_a)
+    
+    # If allocated to treatment A
+    if (alloc == 1) {
+      o = rbinom(1, 1, r_a)
+      pts[[i]] = 0
+
+    # If allocated to trt B  
+    } else {
+      o = rbinom(1, 1, r_b)
+      pts[[i]] = 1
+      
+    }
+    outcome[[i]] = o
+  }
+  
+  return(pts)
+  
+}
+
+set.seed(1)
+balanced_sims = lapply(1:n.sim, function(i){
+  balanced_design(response.a, response.b, 4)
+})
+
+prop.B.balanced = mean(sapply(balanced_sims, mean))
+
+
+
+par(mfrow = c(1, 2))
+hist(sapply(ptw_sims, sum), main = "Zelen's PTW", xlab = "Number of patients")
+hist(sapply(balanced_sims, sum), main = "Balanced design", xlab = "Number of patients")
+```
+
+Using Zelen's play the winner rule, the first 4 patients are allocated to treatment B about `r round(prop.B.ptw*100, 0)`\% of the time, on average. The distribution of patients to treatment B is shown in the histogram above, where we give 3 out of 4 patients trt B. Meanwhile, the balanced design (1:1 randomization for all patients) allocates 2 patients to trt B on average (rate of `r round(prop.B.balanced, 2)`\%).
+
+### b) 
+
+```{r}
+response.a = 0.3
+response.b = 0.3
+n.sim = 1e4
+
+set.seed(1)
+ptw_sims = lapply(1:n.sim, function(i){
+  ptw(0.5, 0.5, response.a, response.b, 4)
+})
+
+prop.B.ptw = mean(sapply(ptw_sims, mean))
+
+####
+
+set.seed(1)
+balanced_sims = lapply(1:n.sim, function(i){
+  balanced_design(response.a, response.b, 4)
+})
+
+prop.B.balanced = mean(sapply(balanced_sims, mean))
+
+
+par(mfrow = c(1, 2))
+hist(sapply(ptw_sims, sum), main = "Zelen's PTW", xlab = "Number of patients")
+hist(sapply(balanced_sims, sum), main = "Balanced design", xlab = "Number of patients")
+```
+
+When both treatments have the same response rate, the first 4 patients are allocated to treatment B about `r round(prop.B.ptw*100, 0)`\% of the time, on average. This allocation rate is about identical to the balanced design, however the actual distribution of number of patients varies between designs (see histograms). 
+
+## Problem 12
+
+```{r rptw}
+rptw = function(r_a, r_b, n) {
+  
+  na = nb = 1
+  pts = c()
+  outcome = c()
+  
+  for (i in 1:n) {
+    
+    p_a = na/(na + nb)
+    p_b = nb/(na + nb)
+    
+    # Randomize pt
+    alloc = rbinom(1, 1, p_a)
+    
+    # If allocated to treatment A
+    if (alloc == 1) {
+      o = rbinom(1, 1, r_a)
+      pts[[i]] = 0
+      
+      # If success, stay on trt A, otherwise switch to trt B
+      if (o == 1) {
+        na = na + 1
+      } else {
+        nb = nb + 1
+      }
+      
+    # If allocated to trt B  
+    } else {
+      o = rbinom(1, 1, r_b)
+      pts[[i]] = 1
+
+      # If success, stay on trt B, otherwise switch to trt A
+      if (o == 1) {
+        nb = nb + 1
+      } else {
+        na = na + 1
+      }
+      
+    }
+    outcome[[i]] = o
+  }
+  
+  return(pts)
+}
+
+response.a = 0.2
+response.b = 0.8
+n.sim = 1e4
+
+set.seed(1)
+rptw_sims = lapply(1:n.sim, function(i){
+  rptw(response.a, response.b, 4)
+})
+
+prop.B = mean(sapply(rptw_sims, mean))
+
+hist(sapply(rptw_sims, sum), main = "RPTW: Number of patients allocated to trt B under alternative", xlab = "Number of patients")
 
 ```
+
+
+```{r}
+response.a = 0.3
+response.b = 0.3
+n.sim = 1e4
+
+set.seed(1)
+rptw_sims = lapply(1:n.sim, function(i){
+  rptw(response.a, response.b, 4)
+})
+
+prop.B = mean(sapply(rptw_sims, mean))
+
+hist(sapply(rptw_sims, sum), main = "RPTW: Number of patients allocated to trt B under null", xlab = "Number of patients")
+```
+
+\pagebreak
 
