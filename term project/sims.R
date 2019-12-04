@@ -1,6 +1,8 @@
 source(file.path(getwd(), "term project/fns.R"))
 
-dlt.true = c(0.011, 0.064, 0.195, 0.330, 0.446) # From Sumithra
+target.dlt = 0.25
+
+dlt.true = c(0.011, 0.10, 0.15, 0.25, 0.4)  # c(0.011, 0.064, 0.195, 0.330, 0.446) # From Sumithra
 n.dose = length(dlt.true)
 
 # from Sumithra
@@ -9,17 +11,16 @@ response = list(
   rep(0.5, n.dose), # CD = 1
   c(0.2, 0.5, 0.8, 0.8, 0.8), # CD = 4
   c(0.8, 0.6, 0.4, 0.3, 0.2), # CD = 1
-  c(0.3, 0.6, 0.8, 0.6, 0.3) # CD = 3
+  c(0.3, 0.8, 0.65, 0.45, 0.3) # CD = 3
 )
 
 N = 1e3 # number of simulations per efficacy scenario
 p.hist = 0.4 # historical response rate 
 
-target.dlt = 0.2
-mtd.true = 4
-correct.dose = c(4, 1, 3, 1, 3)
+mtd.true = tail(which(dlt.true <= target.dlt), n = 1)
+correct.dose = c(4, 1, 3, 1, 2)
 
-# plot dose-tox-eff
+# Figure 1
 par(mfrow = c(3, 2))
 for (i in 1:length(response)) {
   plot(x = 1:n.dose, y = dlt.true, type = 'b',
@@ -46,63 +47,64 @@ legend(x = 0, y = 10, legend = c("Dose-toxicity", "Dose-efficacy", "Target toxic
 
 
 ############################################ Simulations ############################################
-# three.sims = lapply(response, function(i){
-#   lapply(1:N, function(j) { 
-#     pipeline(p.true = dlt.true, 
-#              n.dose = n.dose, 
-#              p.response = i, 
-#              p1.design = "3+3",
-#              hist = p.hist, 
-#              p1.n = 33, 
-#              p2.n = 40, 
-#              p2.alpha = 0.05) 
-#   })
-# })  
-# 
-# crm.sims = lapply(response, function(i){
-#   lapply(1:N, function(j) { 
-#     pipeline(p.true = dlt.true, 
-#              n.dose = n.dose, 
-#              p.response = i, 
-#              p1.design = "crm",
-#              hist = p.hist, 
-#              targetDLT = 0.2,
-#              p1.n = 33, 
-#              p2.n = 40, 
-#              p2.alpha = 0.05) 
-#   })
-# })
+
+############ 3 + 3 #############
+
+three.sims = lapply(response, function(i){
+  lapply(1:N, function(j) {
+    pipeline(p.true = dlt.true,
+             n.dose = n.dose,
+             p.response = i,
+             p1.design = "3+3",
+             hist = p.hist,
+             p1.n = 33,
+             p2.n = 40,
+             p2.alpha = 0.05)
+  })
+})
+
+
+############# CRM ##############
+
+crm.sims = lapply(response, function(i){
+  lapply(1:N, function(j) {
+    pipeline(p.true = dlt.true,
+             n.dose = n.dose,
+             p.response = i,
+             p1.design = "crm",
+             hist = p.hist,
+             targetDLT = 0.2,
+             p1.n = 33,
+             p2.n = 40,
+             p2.alpha = 0.05)
+  })
+})
 
 
 ############ EffTox #############
-dat <- efftox_parameters_demo()
+library(foreach)
+library(doParallel)
 
-efftox.sims = trialr::efftox_simulate(dat, num_sims = 2, first_dose = 1, 
-                                      true_eff = response[[1]],
-                                      true_tox = dlt.true,
-                                      cohort_sizes = rep(3, 11))
+numCores = detectCores()
+registerDoParallel(numCores)
 
+start = Sys.time()
+#vector(mode = "list", length = length(response))
+efftox.sims = foreach (yyy = 1:length(response)) %dopar% {
+  pipeline(p.true = dlt.true,
+           n.dose = n.dose,
+           p.response = response[[yyy]],
+           p1.design = "efftox",
+           real.doses = c(1, 2, 4, 6.6, 10), ## need to get a reasonable vector from paper
+           hist = p.hist,
+           targetDLT = 0.2,
+           p1.n = 33,
+           p2.n = 40,
+           p2.alpha = 0.05,
+           n.sims = N)
+}
+end = Sys.time()
+end - start
   
+save.image(file = file.path(getwd(), "term project/sims.RData"))
 
-test = pipeline(p.true = dlt.true,
-                n.dose = n.dose,
-                p.response = response[[3]],
-                p1.design = "efftox",
-                real.doses = c(1, 2, 4, 6.6, 10), ## need to get a reasonable vector from paper
-                hist = p.hist,
-                targetDLT = 0.2,
-                p1.n = 33,
-                p2.n = 40,
-                p2.alpha = 0.05,
-                n.sims = 2)
-
-library(trialr)
-dat <- efftox_parameters_demo()
-set.seed(123)
-# Let's say we want to use only 2 chains. Extra args are passed to stan
-## Not run: 
-sims <- efftox_simulate(dat, num_sims = 2, first_dose = 1,
-                        true_eff = response[[1]],
-                        true_tox = dlt.true,
-                        cohort_sizes = rep(3, 13),
-                        chains = 2)
