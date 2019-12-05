@@ -1,0 +1,148 @@
+---
+title: "Tables and Figures"
+author: "Alyssa Vanderbeek"
+date: "12/5/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+
+load(file.path(getwd(), "term project/sims_null.RData"))
+load(file.path(getwd(), "term project/sims_alt.RData"))
+```
+
+
+```{r fig1}
+mtd.true = tail(which(dlt.true <= target), n = 1)
+
+par(mfrow = c(3, 2))
+for (i in 1:length(response.alt)) {
+  plot(x = 1:n.dose, y = dlt.true, type = 'b',
+       ylim = c(0, 1),
+       col = "red",
+       xlab = "",
+       ylab = "")
+  lines(x = 1:n.dose, y = response.alt[[i]], type = 'b',
+        ylim = c(0, 1),
+        col = "green")
+  abline(h = target, lty = 2)
+  title(main = paste("Scenario", i, sep = " "),
+        xlab = "Dose",
+        ylab = "Probability")
+  points(x = mtd.true, y = dlt.true[[mtd.true]], pch = 17, cex = 1.2) # MTD
+  points(x = correct.dose[[i]], response.alt[[i]][correct.dose[[i]]], pch = 8, cex = 1.2) # correct dose
+}
+plot(1, type = "n", xlab = "", ylab = "", xlim = c(0, 10), ylim = c(0, 10), axes = FALSE,
+     xaxt = "n", yaxt = "n")
+legend(x = 0, y = 10, legend = c("Dose-toxicity", "Dose-efficacy", "Target toxicity", "MTD", "Correct dose"),
+       col = c("red", "green", "black", "black", "black"),
+       lty = c(1, 1, 2, NA, NA), pch = c(1, 1, NA, 17, 8),
+       cex = 1.2, bty = "n")
+
+```
+
+
+```{r table1}
+selection_33 = lapply(three.sims, function(i){
+  tt = unlist(lapply(i, `[[`, 2))
+  tt = replace(tt, tt == "Dose not selected", NA)
+  return(as.numeric(tt))
+})
+selection_crm = lapply(crm.sims, function(i){
+  tt = unlist(lapply(i, `[[`, 2))
+  tt = replace(tt, tt == "Dose not selected", NA)
+  return(as.numeric(tt))
+})
+selection_efftox = lapply(efftox.sims, function(i){
+  tt = unlist(lapply(i, `[[`, 2))
+  tt = replace(tt, tt == "Dose not selected", NA)
+  return(as.numeric(tt))
+})
+
+rbind(c(dlt.true, "--"),
+      c(response[[1]], "--"),
+      c(table(selection_33[[1]])/N, sum(is.na(selection_33[[1]]))/N),
+      c(table(selection_crm[[1]])/N, sum(is.na(selection_crm[[1]]))/N),
+      c(table(selection_efftox[[1]])/N, sum(is.na(selection_efftox[[1]]))/N),
+      c(response[[2]], "--"),
+      c(table(selection_33[[2]])/N, sum(is.na(selection_33[[2]]))/N),
+      c(table(selection_crm[[2]])/N, sum(is.na(selection_crm[[2]]))/N),
+      c(table(selection_efftox[[2]])/N, sum(is.na(selection_efftox[[2]]))/N),
+      c(response[[3]], "--"),
+      c(table(selection_33[[3]])/N, sum(is.na(selection_33[[3]]))/N),
+      c(table(selection_crm[[3]])/N, sum(is.na(selection_crm[[3]]))/N),
+      c(table(selection_efftox[[3]])/N, sum(is.na(selection_efftox[[3]]))/N),
+      c(response[[4]], "--"),
+      c(table(selection_33[[4]])/N, sum(is.na(selection_33[[4]]))/N),
+      c(table(selection_crm[[4]])/N, sum(is.na(selection_crm[[4]]))/N),
+      c(table(selection_efftox[[4]])/N, sum(is.na(selection_efftox[[4]]))/N),
+      c(response[[5]], "--"),
+      c(table(selection_33[[5]])/N, sum(is.na(selection_33[[5]]))/N),
+      c(table(selection_crm[[5]])/N, sum(is.na(selection_crm[[5]]))/N),
+      c(table(selection_efftox[[5]])/N, sum(is.na(selection_efftox[[5]]))/N)) %>%
+  `colnames<-`(c(1, 2, 3, 4, 5, "Dose not found")) %>%
+  `rownames<-`(c("pDLT",
+                 "PFS",
+                 "3 + 3",
+                 "CRM",
+                 "EffTox",
+                 "PFS",
+                 "3 + 3",
+                 "CRM",
+                 "EffTox",
+                 "PFS",
+                 "3 + 3",
+                 "CRM",
+                 "EffTox",
+                 "PFS",
+                 "3 + 3",
+                 "CRM",
+                 "EffTox",
+                 "PFS",
+                 "3 + 3",
+                 "CRM",
+                 "EffTox"
+                 ))
+```
+
+```{r}
+n_33 = lapply(three.sims, function(i){
+  n1 = unlist(lapply(i, `[[`, 1))
+  ntotal = n1 + 40
+  m = ceiling(mean(ntotal))
+  s = round(sd(ntotal), 2)
+  return(paste0(m, " (", s, ")"))
+})
+n_crm = lapply(crm.sims, function(i){
+  n1 = unlist(lapply(i, `[[`, 1))
+  ntotal = n1 + 40
+  m = ceiling(mean(ntotal))
+  s = round(sd(ntotal), 2)
+  return(paste0(m, " (", s, ")"))
+})
+n_efftox = lapply(efftox.sims, function(i){
+  n1 = unlist(lapply(i, `[[`, 1))
+  ntotal = n1 + 40
+  m = ceiling(mean(ntotal))
+  s = round(sd(ntotal), 2)
+  return(paste0(m, " (", s, ")"))
+})
+
+rbind(unlist(n_33),
+      unlist(n_crm),
+      unlist(n_efftox)) %>%
+  `colnames<-`(c(1:5)) %>%
+  `rownames<-`(c("3 + 3",
+                 "CRM",
+                 "EffTox"))
+
+```
+
+
+```{r fig2}
+
+```
+
